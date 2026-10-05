@@ -9,9 +9,20 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="fr_FR">
   <meta property="og:site_name" content="Barber Truck 93">
+  <meta property="og:url" content="https://barbertruck.vercel.app/">
+  <meta property="og:image" content="https://barbertruck.vercel.app/assets/img/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Logo Barber Truck 93">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Barber Truck 93 – Le barber shop mobile">
+  <meta name="twitter:image" content="https://barbertruck.vercel.app/assets/img/og-image.jpg">
   <meta property="og:title" content="Barber Truck 93 – Le barber shop mobile">
   <meta property="og:description" content="Un coiffeur de qualité, directement près de chez vous. Déplacement dans toute l'Île-de-France.">
-  <link rel="icon" type="image/png" href="assets/img/logo.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
   <link rel="preload" href="assets/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/img/hero-van.jpg" as="image">
@@ -44,7 +55,7 @@
   <header class="site-header" id="top">
     <div class="site-header__inner">
       <a class="logo" href="#accueil" aria-label="Barber Truck 93 – Accueil">
-        <img src="assets/img/logo.png" alt="Barber Truck 93" width="147" height="81">
+        <img src="assets/img/logo-header.png" alt="Barber Truck 93" width="150" height="81">
       </a>
 
       <nav class="nav" id="menu" aria-label="Navigation principale">
@@ -186,16 +197,46 @@
         <ul class="legend" aria-hidden="true">
           <li><span class="legend__dot legend__dot--available"></span>Disponible</li>
           <li><span class="legend__dot legend__dot--selected"></span>Sélectionné</li>
+          <li><span class="legend__dot legend__dot--pending"></span>En attente</li>
           <li><span class="legend__dot legend__dot--disabled"></span>Indisponible</li>
         </ul>
 
-        <div class="booking__footer">
-          <p class="booking__status" id="booking-status" role="status"></p>
-          <button class="btn btn--dark booking__confirm" id="booking-confirm" type="button" aria-disabled="true">
-            <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg>
-            <span>Confirmer mon rendez-vous</span>
-            <svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg>
-          </button>
+        <form class="booking__form" id="booking-form" novalidate>
+          <div class="booking__fields" id="booking-fields" hidden>
+            <p class="booking__hint">Renseignez vos coordonnées. Votre demande doit être confirmée par nos soins : le créneau n'est définitivement réservé qu'après notre confirmation.</p>
+            <div class="field">
+              <label for="f-name">Nom et prénom</label>
+              <input id="f-name" name="name" type="text" autocomplete="name" required minlength="2" maxlength="80">
+            </div>
+            <div class="field">
+              <label for="f-phone">Téléphone</label>
+              <input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" placeholder="06 12 34 56 78">
+            </div>
+            <div class="field field--wide">
+              <label for="f-address">Adresse</label>
+              <input id="f-address" name="address" type="text" autocomplete="street-address" required minlength="8" maxlength="200" placeholder="N°, rue, code postal, ville">
+            </div>
+            <div class="field" id="field-party" hidden>
+              <label for="f-party">Nombre de personnes (minimum 3)</label>
+              <input id="f-party" name="party" type="number" inputmode="numeric" min="3" max="20" value="3">
+            </div>
+            <div class="hp" aria-hidden="true"><label>Ne pas remplir <input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+          </div>
+          <div class="booking__footer">
+            <p class="booking__status" id="booking-status" role="status"></p>
+            <button class="btn btn--dark booking__confirm" id="booking-confirm" type="submit" aria-disabled="true">
+              <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg>
+              <span>Confirmer mon rendez-vous</span>
+              <svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg>
+            </button>
+          </div>
+        </form>
+
+        <div class="booking__done" id="booking-done" role="status" hidden>
+          <span class="booking__done-icon"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
+          <h3 class="booking__done-title">Demande envoyée</h3>
+          <p class="booking__done-text" id="booking-done-text"></p>
+          <button class="btn btn--light btn--sm" id="booking-reset" type="button">Faire une autre demande</button>
         </div>
       </section>
     </div>
@@ -258,7 +299,7 @@
   <footer class="footer" id="contact">
     <div class="footer__grid">
       <div class="footer__col footer__brand">
-        <a href="#accueil" aria-label="Barber Truck 93 – Retour en haut"><img src="assets/img/logo-footer.png" alt="Barber Truck 93" width="108" height="75" loading="lazy"></a>
+        <a href="#accueil" aria-label="Barber Truck 93 – Retour en haut"><img src="assets/img/logo-header.png" alt="Barber Truck 93" width="130" height="70" loading="lazy"></a>
         <p>Le barber shop mobile qui se déplace<br>dans toute l'Île-de-France.<br>Style, qualité et bonne ambiance.</p>
       </div>
       <nav class="footer__col" aria-label="Navigation du pied de page">
@@ -295,6 +336,8 @@
     </div>
   </footer>
 
+  <script src="js/config.js" defer></script>
+  <script src="js/api.js" defer></script>
   <script src="js/main.js" defer></script>
 </body>
 </html>

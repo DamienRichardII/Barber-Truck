@@ -93,19 +93,25 @@
     videos.forEach((v) => io.observe(v));
   }
 
-  /* ---------- Réservation (front uniquement) ---------- */
+  /* ---------- Réservation ---------- */
   function initBooking() {
     const root = $('#reservation');
     if (!root) return;
 
+    const api = window.BarberAPI;
     const daysEl = $('#cal-days', root);
     const titleEl = $('#cal-title', root);
     const slotsEl = $('#slots-grid', root);
     const slotsDateEl = $('#slots-date', root);
     const prevBtn = $('[data-cal="prev"]', root);
     const nextBtn = $('[data-cal="next"]', root);
+    const form = $('#booking-form', root);
+    const fieldsEl = $('#booking-fields', root);
+    const partyField = $('#field-party', root);
     const confirmBtn = $('#booking-confirm', root);
     const statusEl = $('#booking-status', root);
+    const doneEl = $('#booking-done', root);
+    const doneText = $('#booking-done-text', root);
     const steps = $$('.steps__item', root);
 
     const today = new Date();
@@ -114,18 +120,50 @@
       view: new Date(today.getFullYear(), today.getMonth(), 1),
       date: new Date(today),
       slot: null,
-      service: $('input[name="service"]:checked', root)?.dataset.label || '',
+      service: '',
+      serviceLabel: '',
+      taken: new Map(), // "YYYY-MM-DD|18h00" -> "pending" | "confirmed"
+      sending: false,
     };
 
-    const sameDay = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const sameDay = (a, b) => a && b && iso(a) === iso(b);
     const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const longDate = (d) => `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    const takenStatus = (d, time) => state.taken.get(`${iso(d)}|${time}`);
+
+    function setStatus(msg, isError = false) {
+      statusEl.textContent = msg;
+      statusEl.classList.toggle('is-error', isError);
+    }
 
     function setStep(n) {
       steps.forEach((li, i) => {
         li.classList.toggle('is-done', i + 1 < n);
         li.classList.toggle('is-current', i + 1 === n);
       });
+    }
+
+    function readService() {
+      const input = $('input[name="service"]:checked', root);
+      state.service = input ? input.value : '';
+      state.serviceLabel = input ? input.dataset.label : '';
+      partyField.hidden = state.service !== 'offre-groupe';
+    }
+
+    /* créneaux déjà pris, pour le mois affiché */
+    async function loadTaken() {
+      if (!api || !api.isConfigured) return;
+      const from = new Date(state.view.getFullYear(), state.view.getMonth(), 1);
+      const to = new Date(state.view.getFullYear(), state.view.getMonth() + 1, 0);
+      try {
+        const rows = await api.getTakenSlots(iso(from), iso(to));
+        const monthKey = iso(from).slice(0, 7);
+        [...state.taken.keys()].filter((k) => k.startsWith(monthKey)).forEach((k) => state.taken.delete(k));
+        rows.forEach((r) => state.taken.set(`${r.slot_date}|${r.slot_time}`, r.status));
+        if (state.slot && takenStatus(state.date, state.slot)) { state.slot = null; updateForm(); }
+        renderSlots();
+      } catch { /* on garde l'affichage actuel : l'envoi vérifiera de toute façon */ }
     }
 
     function renderCalendar() {
@@ -164,86 +202,193 @@
       slotsDateEl.textContent = longDate(state.date);
       const frag = document.createDocumentFragment();
       SLOTS.forEach((time) => {
+        const status = takenStatus(state.date, time);
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'slot';
-        b.textContent = time;
         b.dataset.time = time;
-        b.setAttribute('aria-pressed', String(state.slot === time));
-        if (state.slot === time) b.classList.add('is-selected');
+        if (status) {
+          b.disabled = true;
+          b.classList.add(status === 'pending' ? 'slot--pending' : 'slot--booked');
+          const label = document.createElement('span');
+          label.className = 'slot__time';
+          label.textContent = time;
+          b.append(label);
+          if (status === 'pending') {
+            const small = document.createElement('small');
+            small.textContent = 'En attente';
+            b.append(small);
+          }
+          b.setAttribute('aria-label', `${time} – ${status === 'pending' ? 'en attente de confirmation' : 'indisponible'}`);
+        } else {
+          b.textContent = time;
+          b.setAttribute('aria-pressed', String(state.slot === time));
+          if (state.slot === time) b.classList.add('is-selected');
+        }
         frag.append(b);
       });
       slotsEl.replaceChildren(frag);
     }
 
-    function updateConfirm() {
+    /* champs de contact visibles dès qu'un créneau est choisi */
+    function updateForm() {
       const ready = Boolean(state.slot);
+      fieldsEl.hidden = !ready;
       confirmBtn.setAttribute('aria-disabled', String(!ready));
-      confirmBtn.classList.remove('is-done');
-      confirmBtn.querySelector('span').textContent = 'Confirmer mon rendez-vous';
     }
 
-    // prestation
+    function clearInvalid() {
+      $$('[aria-invalid]', form).forEach((el) => el.removeAttribute('aria-invalid'));
+    }
+
+    function validate() {
+      clearInvalid();
+      const f = form.elements;
+      const phone = f.phone.value.replace(/[^\d+]/g, '');
+      const checks = [
+        [f.name, f.name.value.trim().length >= 2, 'Merci d\'indiquer votre nom et prénom.'],
+        [f.phone, /^\+?\d{9,15}$/.test(phone), 'Merci d\'indiquer un numéro de téléphone valide.'],
+        [f.address, f.address.value.trim().length >= 8, 'Merci d\'indiquer votre adresse complète.'],
+      ];
+      if (state.service === 'offre-groupe') {
+        const n = Number(f.party.value);
+        checks.push([f.party, Number.isInteger(n) && n >= 3 && n <= 20, 'L\'offre groupe demande entre 3 et 20 personnes.']);
+      }
+      const bad = checks.find(([, ok]) => !ok);
+      if (bad) {
+        bad[0].setAttribute('aria-invalid', 'true');
+        bad[0].focus();
+        setStatus(bad[2], true);
+        return null;
+      }
+      return {
+        name: f.name.value.trim(),
+        phone,
+        address: f.address.value.trim(),
+        partySize: state.service === 'offre-groupe' ? Number(f.party.value) : 1,
+      };
+    }
+
+    function resetFlow() {
+      doneEl.hidden = true;
+      form.hidden = false;
+      form.reset();
+      state.slot = null;
+      setStatus('');
+      setStep(1);
+      readService();
+      renderSlots();
+      updateForm();
+    }
+
+    /* prestation */
     root.addEventListener('change', (e) => {
       if (e.target.name !== 'service') return;
-      state.service = e.target.dataset.label;
-      statusEl.textContent = '';
+      readService();
+      setStatus('');
       setStep(2);
     });
 
-    // mois précédent / suivant
-    prevBtn.addEventListener('click', () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth() - 1, 1); renderCalendar(); });
-    nextBtn.addEventListener('click', () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth() + 1, 1); renderCalendar(); });
+    /* mois précédent / suivant */
+    const changeMonth = (delta) => {
+      state.view = new Date(state.view.getFullYear(), state.view.getMonth() + delta, 1);
+      renderCalendar();
+      loadTaken();
+    };
+    prevBtn.addEventListener('click', () => changeMonth(-1));
+    nextBtn.addEventListener('click', () => changeMonth(1));
 
-    // date
+    /* date */
     daysEl.addEventListener('click', (e) => {
       const btn = e.target.closest('.day');
       if (!btn || btn.disabled) return;
       state.date = new Date(state.view.getFullYear(), state.view.getMonth(), Number(btn.dataset.day));
       state.slot = null;
-      statusEl.textContent = '';
+      setStatus('');
       renderCalendar();
       renderSlots();
-      updateConfirm();
+      updateForm();
       setStep(3);
     });
 
-    // créneau
+    /* créneau */
     slotsEl.addEventListener('click', (e) => {
       const btn = e.target.closest('.slot');
-      if (!btn) return;
+      if (!btn || btn.disabled) return;
       state.slot = btn.dataset.time;
-      statusEl.textContent = '';
+      setStatus('');
       renderSlots();
-      updateConfirm();
+      updateForm();
       setStep(3);
     });
 
-    // confirmation (démonstration : aucun envoi de données)
-    confirmBtn.addEventListener('click', () => {
-      if (confirmBtn.getAttribute('aria-disabled') === 'true') {
-        statusEl.textContent = 'Choisissez un horaire pour continuer.';
+    /* envoi de la demande */
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (state.sending) return;
+      if (!state.slot) {
+        setStatus('Choisissez un horaire pour continuer.', true);
         return;
       }
-      statusEl.textContent = `${state.service} · ${cap(longDate(state.date))} · ${state.slot}`;
-      confirmBtn.classList.add('is-done');
-      confirmBtn.querySelector('span').textContent = 'Sélection enregistrée';
-    });
+      if (form.elements.website.value) return; // anti-spam (champ piège)
+      const contact = validate();
+      if (!contact) return;
 
-    // CTA des cartes prestations → présélection + défilement vers la réservation
+      state.sending = true;
+      confirmBtn.classList.add('is-loading');
+      confirmBtn.setAttribute('aria-disabled', 'true');
+      setStatus('Envoi de votre demande…');
+      const sent = { date: new Date(state.date), time: state.slot };
+      try {
+        await api.createBooking({
+          service: state.service,
+          partySize: contact.partySize,
+          date: iso(sent.date),
+          time: sent.time,
+          name: contact.name,
+          phone: contact.phone,
+          address: contact.address,
+        });
+        state.taken.set(`${iso(sent.date)}|${sent.time}`, 'pending');
+        form.hidden = true;
+        doneText.textContent = `${state.serviceLabel} · ${cap(longDate(sent.date))} à ${sent.time}. `
+          + `Votre créneau est en attente de confirmation de notre part. Nous vous contactons au ${contact.phone} pour le valider.`;
+        doneEl.hidden = false;
+        setStep(3);
+        steps.forEach((li) => li.classList.add('is-done'));
+        renderSlots();
+        doneEl.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'nearest' });
+      } catch (err) {
+        setStatus(api.message(err.code), true);
+        if (err.code === 'slot_taken') { state.slot = null; updateForm(); }
+        loadTaken();
+      } finally {
+        state.sending = false;
+        confirmBtn.classList.remove('is-loading');
+        confirmBtn.setAttribute('aria-disabled', String(!state.slot));
+      }
+    });
+    $('#booking-reset', root).addEventListener('click', resetFlow);
+
+    /* CTA des cartes prestations : présélection puis défilement vers la réservation */
     $$('[data-service]').forEach((link) => {
       link.addEventListener('click', () => {
         const input = $(`input[name="service"][value="${link.dataset.service}"]`, root);
         if (!input) return;
         input.checked = true;
-        state.service = input.dataset.label;
+        readService();
         setStep(2);
       });
     });
 
+    /* mise à jour quand l'onglet redevient visible */
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadTaken(); });
+
+    readService();
     renderCalendar();
     renderSlots();
-    updateConfirm();
+    updateForm();
+    loadTaken();
   }
 
   initHeader();

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Administration – Barber Truck 93</title>
+  <link rel="icon" href="../favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header class="bar">
+    <img src="../assets/img/logo-header.png" alt="Barber Truck 93" width="86" height="46">
+    <h1>Réservations</h1>
+    <div class="bar__actions" id="bar-actions" hidden>
+      <button class="btn btn--ghost" id="refresh" type="button">Actualiser</button>
+      <button class="btn btn--ghost" id="logout" type="button">Déconnexion</button>
+    </div>
+  </header>
+
+  <main>
+    <form class="login" id="login" novalidate>
+      <h2>Connexion</h2>
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">Mot de passe</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button class="btn btn--dark" type="submit">Se connecter</button>
+      <p class="msg" id="login-msg" role="alert"></p>
+    </form>
+
+    <section id="panel" hidden>
+      <nav class="tabs" id="tabs" aria-label="Filtrer les demandes">
+        <button type="button" data-filter="pending" class="is-active">En attente <span class="count" id="count-pending">0</span></button>
+        <button type="button" data-filter="confirmed">Confirmées</button>
+        <button type="button" data-filter="closed">Refusées / annulées</button>
+        <button type="button" data-filter="all">Toutes</button>
+      </nav>
+      <p class="msg" id="list-msg" role="status"></p>
+      <ul class="list" id="list"></ul>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
