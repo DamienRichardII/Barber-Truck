@@ -162,7 +162,7 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .panel__title{margin-top:.5rem}
 .panel__text{margin-top:.6rem}
 
-.location__map{width:100%;height:auto;margin-top:1.25rem;border-radius:.6rem;aspect-ratio:834/518;object-fit:cover}
+.location__map{width:100%;margin-top:1.25rem;border-radius:.6rem;aspect-ratio:834/518;background:#eceeea}
 .location__card{display:flex;align-items:center;gap:.9rem;margin-top:.75rem;padding:.9rem;border-radius:.6rem;background:#fff;box-shadow:var(--shadow);border:1px solid var(--line)}
 .icon--pin{width:1.7rem;height:1.7rem;stroke-width:1.5}
 .location__info{display:grid;flex:1;min-width:0;font-size:var(--fs-small);line-height:1.4}
