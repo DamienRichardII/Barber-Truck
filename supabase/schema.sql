@@ -22,7 +22,7 @@ create table if not exists public.bookings (
   address     text not null check (char_length(address) between 8 and 200),
   status      text not null default 'pending' check (status in ('pending', 'confirmed', 'declined', 'cancelled')),
   constraint bookings_party_ck check (
-    (service = 'offre-groupe' and party_size >= 3) or (service = 'coupe-deplacement' and party_size = 1)
+    (service = 'offre-groupe' and party_size >= 3) or (service = 'coupe-deplacement' and party_size between 1 and 2)
   )
 );
 
@@ -131,7 +131,10 @@ begin
       raise exception 'invalid_party_size';
     end if;
   else
-    v_size := 1;
+    v_size := coalesce(p_party_size, 1);
+    if v_size < 1 or v_size > 2 then
+      raise exception 'invalid_party_size';
+    end if;
   end if;
 
   -- anti-abus : 3 demandes en attente maximum par numéro

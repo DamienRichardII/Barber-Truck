@@ -148,7 +148,14 @@
       const input = $('input[name="service"]:checked', root);
       state.service = input ? input.value : '';
       state.serviceLabel = input ? input.dataset.label : '';
-      partyField.hidden = state.service !== 'offre-groupe';
+      const group = state.service === 'offre-groupe';
+      const pf = $('#f-party', root);
+      const pl = $('#l-party', root);
+      pf.min = group ? '3' : '1';
+      pf.max = group ? '20' : '2';
+      pl.textContent = group ? 'Nombre de personnes à couper (minimum 3)' : 'Nombre de personnes à couper (1 ou 2)';
+      const cur = Number(pf.value);
+      if (!Number.isInteger(cur) || cur < Number(pf.min) || cur > Number(pf.max)) pf.value = pf.min;
     }
 
     /* créneaux déjà pris, pour le mois affiché */
@@ -250,9 +257,12 @@
         [f.phone, /^\+?\d{9,15}$/.test(phone), 'Merci d\'indiquer un numéro de téléphone valide.'],
         [f.address, f.address.value.trim().length >= 8, 'Merci d\'indiquer votre adresse complète.'],
       ];
-      if (state.service === 'offre-groupe') {
+      {
+        const group = state.service === 'offre-groupe';
+        const lo = group ? 3 : 1;
+        const hi = group ? 20 : 2;
         const n = Number(f.party.value);
-        checks.push([f.party, Number.isInteger(n) && n >= 3 && n <= 20, 'L\'offre groupe demande entre 3 et 20 personnes.']);
+        checks.push([f.party, Number.isInteger(n) && n >= lo && n <= hi, group ? 'L\'offre groupe demande entre 3 et 20 personnes.' : 'Indiquez 1 ou 2 personnes (à partir de 3, choisissez l\'offre groupe).']);
       }
       const bad = checks.find(([, ok]) => !ok);
       if (bad) {
@@ -265,7 +275,7 @@
         name: f.name.value.trim(),
         phone,
         address: f.address.value.trim(),
-        partySize: state.service === 'offre-groupe' ? Number(f.party.value) : 1,
+        partySize: Number(f.party.value),
       };
     }
 

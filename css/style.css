@@ -338,7 +338,7 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
   .booking__hint,.field--wide{grid-column:1/-1}
   .steps__label{display:inline}
   .services__grid{grid-template-columns:1fr 1fr}
-  .gallery__grid{grid-template-columns:repeat(4,1fr)}
+  .gallery__grid{grid-template-columns:repeat(5,1fr)}
   .tile{aspect-ratio:3/4}
   .footer__grid{grid-template-columns:1fr 1.2fr 1fr;gap:1.75rem 1.5rem}
   .footer__brand{grid-column:1/-1;grid-template-columns:auto 1fr;align-items:center;gap:1.25rem}
@@ -475,7 +475,7 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 
   .gallery{padding-top:1.3rem;padding-bottom:1.3rem}
   .gallery__grid{gap:.55rem}
-  .tile{aspect-ratio:155/100;border-radius:.3rem}
+  .tile{aspect-ratio:1/1;border-radius:.3rem}
 
   /* footer */
   .footer{border-top:0}

@@ -95,7 +95,7 @@
       el('dt', { text: 'Client' }), el('dd', { text: b.full_name }),
       el('dt', { text: 'Téléphone' }), el('dd', {}, [phone]),
       el('dt', { text: 'Adresse' }), el('dd', {}, [addr]),
-      el('dt', { text: 'Prestation' }), el('dd', { text: `${SERVICES[b.service] || b.service}${b.service === 'offre-groupe' ? ` · ${b.party_size} personnes` : ''}` }),
+      el('dt', { text: 'Prestation' }), el('dd', { text: `${SERVICES[b.service] || b.service} · ${b.party_size} ${b.party_size > 1 ? 'personnes' : 'personne'}` }),
     ]);
     const btns = el('div', { class: 'card__actions' });
     const act = (label, cls, status) => {

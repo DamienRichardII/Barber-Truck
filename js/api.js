@@ -10,7 +10,7 @@ window.BarberAPI = (() => {
     invalid_phone: 'Numéro de téléphone invalide.',
     invalid_name: 'Merci d\'indiquer votre nom et prénom.',
     invalid_address: 'Merci d\'indiquer une adresse complète.',
-    invalid_party_size: 'L\'offre groupe demande entre 3 et 20 personnes.',
+    invalid_party_size: 'Nombre de personnes invalide pour cette prestation.',
     invalid_date: 'Cette date n\'est pas disponible.',
     invalid_slot: 'Cet horaire n\'est pas disponible.',
     too_many_requests: 'Vous avez déjà plusieurs demandes en attente de confirmation.',
