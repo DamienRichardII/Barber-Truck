@@ -515,15 +515,6 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .location__map{position:relative;z-index:0;overflow:hidden}
 .location__note{margin:.45rem 0 0;font-size:.72rem;color:var(--ink-soft)}
 .loc-line{display:inline}
-.truck-pin{background:none;border:0}
-.truck-pin__badge{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#8a8a86;color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-.truck-pin.is-live .truck-pin__badge{background:#0b0b0b;animation:truck-pulse 2.4s ease-out infinite}
-.truck-pin__badge svg{width:22px;height:22px}
-.truck-pin__badge b{position:absolute;top:-6px;right:-6px;display:grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#fff;color:#0b0b0b;font:700 11px/1 Inter,system-ui,sans-serif;border:1.5px solid #0b0b0b}
-.leaflet-tooltip.truck-label{padding:2px 7px;border:0;border-radius:4px;background:#0b0b0b;color:#fff;font:600 11px/1.3 Inter,system-ui,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-.leaflet-tooltip-bottom.truck-label::before{border-bottom-color:#0b0b0b}
-@keyframes truck-pulse{0%{box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 0 0 rgba(11,11,11,.45)}70%,100%{box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 0 16px rgba(11,11,11,0)}}
-@media (prefers-reduced-motion:reduce){.truck-pin.is-live .truck-pin__badge{animation:none}}
 
 /* carte : rendu monochrome sobre, assorti à la charte noir et blanc */
 .location__map .leaflet-tile-pane{filter:grayscale(1) contrast(.92) brightness(1.06)}
@@ -532,7 +523,29 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .location__map .leaflet-control-zoom a{color:#0b0b0b}
 
 /* carte Google : marqueurs HTML */
-.gm-truck{position:absolute;width:40px;height:40px;transform:translate(-50%,-50%);cursor:default}
-.gm-truck__label{position:absolute;left:50%;top:46px;transform:translateX(-50%);padding:2px 7px;border-radius:4px;background:#0b0b0b;color:#fff;font:600 11px/1.3 Inter,system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .location__map.is-google{background:#f1f1ef}
-.location__map.is-google .gm-style-cc,.location__map.is-google .gmnoprint a{opacity:.85}
+
+/* carte Mapbox */
+.location__map.is-mapbox{background:#1a1a1a}
+.location__map.is-mapbox .gm-truck{transform:none}
+.location__map .mapboxgl-ctrl-group{border-radius:.4rem;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+
+/* repère camion : carte blanche + photo ronde (comme la maquette) */
+.truck-pin{background:none;border:0}
+.truck-pin,.gm-truck{position:absolute;width:56px;height:56px;overflow:visible}
+.gm-truck{transform:translate(-50%,-50%)}
+.location__map.is-mapbox .gm-truck{transform:none}
+.tp-photo{position:absolute;right:0;top:0;width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid #fff;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.35)}
+.tp-card{position:absolute;right:30px;top:50%;transform:translateY(-50%);display:grid;gap:1px;min-width:7.5rem;padding:.55rem 2.3rem .55rem .75rem;border-radius:.55rem;background:#fff;color:#0b0b0b;white-space:nowrap;box-shadow:0 3px 14px rgba(0,0,0,.22);font:400 .68rem/1.3 Inter,system-ui,sans-serif}
+.tp-card strong{font-weight:700;font-size:.74rem}
+.tp-card span{color:#4a4a47}
+.truck-pin.is-live .tp-photo{animation:truck-pulse 2.4s ease-out infinite}
+.truck-pin:not(.is-live) .tp-photo{filter:grayscale(1)}
+@keyframes truck-pulse{0%{box-shadow:0 3px 12px rgba(0,0,0,.35),0 0 0 0 rgba(255,255,255,.7)}70%,100%{box-shadow:0 3px 12px rgba(0,0,0,.35),0 0 0 16px rgba(255,255,255,0)}}
+@media (prefers-reduced-motion:reduce){.truck-pin.is-live .tp-photo{animation:none}}
+@media (max-width:520px){.tp-card{min-width:6.4rem;padding:.45rem 2.1rem .45rem .6rem;font-size:.62rem}.tp-card strong{font-size:.68rem}}
+
+/* carte OpenFreeMap (MapLibre) */
+.location__map.is-openfreemap{background:#111}
+.location__map.is-openfreemap .gm-truck{transform:none}
+.location__map .maplibregl-ctrl-group{border-radius:.4rem;box-shadow:0 2px 10px rgba(0,0,0,.35)}

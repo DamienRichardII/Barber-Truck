@@ -1,6 +1,7 @@
 /* Carte « Où sommes-nous ? » : position des Barber Trucks à l'échelle de la ville.
-   - Google Maps stylisé si BT_CONFIG.googleMapsKey est renseignée (js/config.js),
-     sinon repli automatique sur OpenStreetMap (Leaflet) : la carte n'est jamais vide ;
+   - Mapbox si BT_CONFIG.mapboxToken est renseigné, sinon Google Maps si BT_CONFIG.googleMapsKey l'est,
+     sinon OpenFreeMap (gratuit, sans clé, style sombre par défaut), sinon OpenStreetMap (Leaflet) :
+     la carte n'est jamais vide ;
    - la position publique est déjà arrondie (~2 km) côté base de données ;
    - pas de cercle, noms de rues masqués, zoom plafonné au niveau ville ;
    - positions rechargées toutes les 5 min (les check-ins sont horaires). */
@@ -30,11 +31,13 @@
     return `il y a ${h} h${min % 60 ? String(min % 60).padStart(2, '0') : ''}`;
   };
 
-  const TRUCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h9A1.5 1.5 0 0 1 15 6.5V8h2.6c.5 0 .9.2 1.2.6l2.2 2.9c.3.3.4.7.4 1.1V16a1 1 0 0 1-1 1h-.6a2.5 2.5 0 0 1-4.8 0H9.4a2.5 2.5 0 0 1-4.8 0H4a1 1 0 0 1-1-1V6.5Zm12 3v2.5h4.3l-1.9-2.5H15ZM7 15a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>';
   const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  function truckIcon(name) {
-    const num = (String(name).match(/(\d+)\s*$/) || [])[1] || '';
-    return `<span class="truck-pin__badge">${TRUCK_SVG}${num ? `<b>${escapeHtml(num)}</b>` : ''}</span>`;
+  /* Repère comme sur la maquette : carte blanche (nom, « Actuellement ici », ville) + photo ronde du camion. */
+  function truckPin(t) {
+    const live = Date.now() - t.at <= LIVE_MS;
+    const sub = live ? 'Actuellement ici' : `Dernière position · ${fmtAgo(Date.now() - t.at)}`;
+    return `<span class="tp-card"><strong>${escapeHtml(t.name)}</strong><span>${escapeHtml(sub)}</span><span>${escapeHtml(t.city || 'Zone approximative')}</span></span>`
+      + '<img class="tp-photo" src="assets/img/truck-pin.jpg" alt="" width="56" height="56" decoding="async">';
   }
   const isLive = (t) => Date.now() - t.at <= LIVE_MS;
 
@@ -97,7 +100,7 @@
         const el = document.createElement('div');
         el.className = `truck-pin gm-truck${isLive(this.t) ? ' is-live' : ''}`;
         el.title = this.t.name;
-        el.innerHTML = `${truckIcon(this.t.name)}<span class="gm-truck__label">${escapeHtml(this.t.name)}</span>`;
+        el.innerHTML = truckPin(this.t);
         this.el = el;
         this.getPanes().overlayMouseTarget.append(el);
       }
@@ -132,6 +135,97 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Rendu Mapbox (style sombre ou clair, noms de rues masqués)          */
+  /* ------------------------------------------------------------------ */
+  const MAPBOX_VERSION = 'v3.9.0';
+
+  function loadMapbox() {
+    return new Promise((resolve, reject) => {
+      if (window.mapboxgl) return resolve();
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = `https://api.mapbox.com/mapbox-gl-js/${MAPBOX_VERSION}/mapbox-gl.css`;
+      document.head.append(css);
+      const s = document.createElement('script');
+      s.src = `https://api.mapbox.com/mapbox-gl-js/${MAPBOX_VERSION}/mapbox-gl.js`;
+      s.async = true;
+      s.onload = () => (window.mapboxgl ? resolve() : reject(new Error('mb_load')));
+      s.onerror = () => reject(new Error('mb_load'));
+      document.head.append(s);
+      setTimeout(() => reject(new Error('mb_timeout')), 15000);
+    });
+  }
+
+  function createGLRenderer(gl, style, token) {
+    if (token) gl.accessToken = token;
+    const map = new gl.Map({
+      container: mapEl,
+      style,
+      center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
+      zoom: DEFAULT_ZOOM,
+      minZoom: MIN_ZOOM,
+      maxZoom: MAX_ZOOM,
+      attributionControl: Boolean(token),   // Mapbox : logo/crédit natif ; OpenFreeMap : crédit en pied de page
+      cooperativeGestures: true,     // défilement de la page préservé sur mobile
+      pitchWithRotate: false,
+      dragRotate: false,
+    });
+    map.addControl(new gl.NavigationControl({ showCompass: false }), 'top-left');
+    map.touchZoomRotate.disableRotation();
+
+    // sécurité : on masque les noms de rues et les adresses, on garde les villes
+    const hideStreets = () => {
+      (map.getStyle().layers || []).forEach((l) => {
+        if (l.type === 'symbol' && /road|street|highway|poi|transit|airport|aerodrome|settlement-subdivision|housenum|address|shield/i.test(l.id)) {
+          map.setLayoutProperty(l.id, 'visibility', 'none');
+        }
+      });
+    };
+    map.on('style.load', hideStreets);
+
+    let markers = [];
+    const place = (list) => {
+      markers.forEach((mk) => mk.remove());
+      markers = [];
+      const located = list.filter((t) => t.located);
+      located.forEach((t) => {
+        const el = document.createElement('div');
+        el.className = `truck-pin gm-truck gl-truck${isLive(t) ? ' is-live' : ''}`;
+        el.title = t.name;
+        el.innerHTML = truckPin(t);
+        markers.push(new gl.Marker({ element: el, anchor: 'center' }).setLngLat([t.lng, t.lat]).addTo(map));
+      });
+      if (located.length === 1) map.easeTo({ center: [located[0].lng, located[0].lat], zoom: MAX_ZOOM, duration: 0 });
+      else if (located.length > 1) {
+        const b = new gl.LngLatBounds();
+        located.forEach((t) => b.extend([t.lng, t.lat]));
+        map.fitBounds(b, { padding: 70, maxZoom: MAX_ZOOM, duration: 0 });
+      } else map.easeTo({ center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat], zoom: DEFAULT_ZOOM, duration: 0 });
+    };
+    window.addEventListener('resize', () => map.resize());
+    return { draw: place };
+  }
+
+  const MAPLIBRE_BASE = 'assets/vendor/maplibre/maplibre-gl';
+
+  function loadMapLibre() {
+    return new Promise((resolve, reject) => {
+      if (window.maplibregl) return resolve();
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = `${MAPLIBRE_BASE}.css`;
+      document.head.append(css);
+      const s = document.createElement('script');
+      s.src = `${MAPLIBRE_BASE}.js`;
+      s.async = true;
+      s.onload = () => (window.maplibregl ? resolve() : reject(new Error('ml_load')));
+      s.onerror = () => reject(new Error('ml_load'));
+      document.head.append(s);
+      setTimeout(() => reject(new Error('ml_timeout')), 15000);
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Rendu Leaflet / OpenStreetMap (repli)                               */
   /* ------------------------------------------------------------------ */
   function createLeafletRenderer() {
@@ -159,8 +253,8 @@
           L.marker(ll, {
             keyboard: false,
             title: t.name,
-            icon: L.divIcon({ className: `truck-pin${isLive(t) ? ' is-live' : ''}`, html: truckIcon(t.name), iconSize: [40, 40], iconAnchor: [20, 20] }),
-          }).bindTooltip(t.name, { permanent: true, direction: 'bottom', offset: [0, 18], className: 'truck-label' }).addTo(layer);
+            icon: L.divIcon({ className: `truck-pin${isLive(t) ? ' is-live' : ''}`, html: truckPin(t), iconSize: [56, 56], iconAnchor: [28, 28] }),
+          }).addTo(layer);
         });
         if (points.length === 1) map.setView(points[0], MAX_ZOOM);
         else if (points.length > 1) map.fitBounds(L.latLngBounds(points).pad(0.4), { maxZoom: MAX_ZOOM });
@@ -217,13 +311,39 @@
   }
 
   async function init() {
-    if (cfg.googleMapsKey) {
+    if (cfg.mapboxToken) {
+      try {
+        await loadMapbox();
+        const style = cfg.mapboxStyle || 'mapbox://styles/mapbox/dark-v11';
+        renderer = createGLRenderer(window.mapboxgl, style, cfg.mapboxToken);
+        mapEl.classList.add('is-mapbox');
+        if (/dark|night|satellite/i.test(style)) mapEl.classList.add('is-dark');
+      } catch {
+        renderer = null;
+        mapEl.replaceChildren();
+      }
+    }
+    if (!renderer && cfg.googleMapsKey) {
       try {
         await loadGoogle(cfg.googleMapsKey);
         renderer = createGoogleRenderer();
         mapEl.classList.add('is-google');
       } catch {
         mapEl.replaceChildren();      // nettoie un éventuel message d'erreur Google
+      }
+    }
+    if (!renderer) {
+      try {
+        await loadMapLibre();
+        if (!maplibregl.supported || maplibregl.supported()) {
+          const name = cfg.openfreemapStyle || 'dark';
+          renderer = createGLRenderer(window.maplibregl, `https://tiles.openfreemap.org/styles/${encodeURIComponent(name)}`, '');
+          mapEl.classList.add('is-openfreemap');
+          if (/dark|fiord/i.test(name)) mapEl.classList.add('is-dark');
+        }
+      } catch {
+        renderer = null;
+        mapEl.replaceChildren();
       }
     }
     if (!renderer && window.L) renderer = createLeafletRenderer();
