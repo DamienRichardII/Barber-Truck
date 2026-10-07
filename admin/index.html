@@ -12,7 +12,7 @@
 <body>
   <header class="bar">
     <img src="../assets/img/logo-header.png" alt="Barber Truck 93" width="86" height="46">
-    <h1>Réservations</h1>
+    <h1>Administration</h1>
     <div class="bar__actions" id="bar-actions" hidden>
       <button class="btn btn--ghost" id="refresh" type="button">Actualiser</button>
       <button class="btn btn--ghost" id="logout" type="button">Déconnexion</button>
@@ -31,6 +31,13 @@
     </form>
 
     <section id="panel" hidden>
+      <nav class="views" id="views" aria-label="Sections de l'administration">
+        <button type="button" data-view="requests" class="is-active">Demandes <span class="count" id="count-pending-nav">0</span></button>
+        <button type="button" data-view="planning">Planning</button>
+        <button type="button" data-view="trucks">Camions</button>
+      </nav>
+
+      <div id="view-trucks" hidden>
       <section class="checkin" id="checkin" aria-labelledby="checkin-title">
         <h2 id="checkin-title">Check-in de position</h2>
         <p class="checkin__help">Une fois par heure, appuyez sur le bouton depuis le téléphone du camion. Seule la ville est affichée sur le site (position arrondie à environ 2 km).</p>
@@ -49,6 +56,9 @@
         <p class="msg" id="checkin-msg" role="status"></p>
         <ul class="checkin__list" id="checkin-list"></ul>
       </section>
+      </div>
+
+      <div id="view-requests">
       <nav class="tabs" id="tabs" aria-label="Filtrer les demandes">
         <button type="button" data-filter="pending" class="is-active">En attente <span class="count" id="count-pending">0</span></button>
         <button type="button" data-filter="confirmed">Confirmées</button>
@@ -57,6 +67,40 @@
       </nav>
       <p class="msg" id="list-msg" role="status"></p>
       <ul class="list" id="list"></ul>
+      </div>
+
+      <div id="view-planning" hidden>
+        <ul class="stats" id="plan-stats" aria-label="Résumé"></ul>
+        <div class="plan__filters">
+          <label class="sr-only" for="plan-period">Période</label>
+          <select id="plan-period">
+            <option value="upcoming">À venir</option>
+            <option value="today">Aujourd'hui</option>
+            <option value="past">Passées</option>
+            <option value="all">Toutes les dates</option>
+          </select>
+          <label class="sr-only" for="plan-status">Statut</label>
+          <select id="plan-status">
+            <option value="active">En attente + confirmées</option>
+            <option value="pending">En attente</option>
+            <option value="confirmed">Confirmées</option>
+            <option value="closed">Refusées / annulées</option>
+            <option value="all">Tous les statuts</option>
+          </select>
+          <label class="sr-only" for="plan-search">Rechercher</label>
+          <input id="plan-search" type="search" placeholder="Nom, téléphone, adresse…" autocomplete="off">
+          <button class="btn btn--ghost" id="plan-csv" type="button">Exporter (CSV)</button>
+        </div>
+        <p class="msg" id="plan-msg" role="status"></p>
+        <div class="plan__wrap">
+          <table class="plan" id="plan-table">
+            <thead>
+              <tr><th>Heure</th><th>Client</th><th>Téléphone</th><th>Adresse</th><th>Prestation</th><th>Pers.</th><th>Statut</th><th>Reçue le</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="plan-body"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </main>
 

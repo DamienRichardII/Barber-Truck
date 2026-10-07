@@ -524,3 +524,9 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .leaflet-tooltip-bottom.truck-label::before{border-bottom-color:#0b0b0b}
 @keyframes truck-pulse{0%{box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 0 0 rgba(11,11,11,.45)}70%,100%{box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 0 16px rgba(11,11,11,0)}}
 @media (prefers-reduced-motion:reduce){.truck-pin.is-live .truck-pin__badge{animation:none}}
+
+/* carte : rendu monochrome sobre, assorti à la charte noir et blanc */
+.location__map .leaflet-tile-pane{filter:grayscale(1) contrast(.92) brightness(1.06)}
+.location__map .leaflet-container{background:#ecece9;font-family:inherit}
+.location__map .leaflet-control-zoom{border:0;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.location__map .leaflet-control-zoom a{color:#0b0b0b}

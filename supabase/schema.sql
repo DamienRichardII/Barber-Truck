@@ -196,8 +196,9 @@ create policy "admin lit les camions" on public.trucks
   for select to authenticated
   using (((select auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
 
--- Deux camions au départ : renomme-les ensuite (update public.trucks set name = '…' where name = '…').
-insert into public.trucks (name) values ('Barber Truck 1'), ('Barber Truck 2')
+-- Un camion au départ. Pour en ajouter : insert into public.trucks (name) values ('Barber Truck 2');
+-- Pour renommer : update public.trucks set name = '…' where name = 'Barber Truck 1';
+insert into public.trucks (name) values ('Barber Truck 1')
 on conflict (name) do nothing;
 
 -- Dernière position (arrondie) de chaque camion actif, pour les 12 dernières heures

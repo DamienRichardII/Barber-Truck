@@ -123,12 +123,136 @@
   function render() {
     const pending = rows.filter((r) => r.status === 'pending').length;
     $('#count-pending').textContent = pending;
+    $('#count-pending-nav').textContent = pending;
+    $('#count-pending-nav').hidden = !pending;
     document.title = `${lateFlag ? '⏰ ' : ''}${pending ? `(${pending}) ` : ''}Administration – Barber Truck 93`;
     const match = (r) => filter === 'all' || (filter === 'closed' ? ['declined', 'cancelled'].includes(r.status) : r.status === filter);
     const shown = rows.filter(match);
     listEl.replaceChildren(...shown.map(card));
     listMsg.textContent = shown.length ? '' : 'Aucune demande.';
+    renderPlanning();
   }
+
+  /* ---- planning : toutes les réservations avec toutes leurs informations ---- */
+  const SLOT_ORDER = ['18h00', '19h00', '20h00', '21h00', '22h00', '23h00', '00h00', '01h00', '02h00'];
+  const planBody = $('#plan-body');
+  const planMsg = $('#plan-msg');
+  const planPeriod = $('#plan-period');
+  const planStatus = $('#plan-status');
+  const planSearch = $('#plan-search');
+  const todayParis = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
+  const slotRank = (t) => { const i = SLOT_ORDER.indexOf(t); return i < 0 ? 99 : i; };
+  const fmtShort = (iso) => new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const peopleLabel = (n) => `${n} ${n > 1 ? 'personnes' : 'personne'}`;
+
+  function planFiltered() {
+    const today = todayParis();
+    const q = planSearch.value.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, '');
+    return rows.filter((r) => {
+      const p = planPeriod.value;
+      if (p === 'upcoming' && r.slot_date < today) return false;
+      if (p === 'today' && r.slot_date !== today) return false;
+      if (p === 'past' && r.slot_date >= today) return false;
+      const s = planStatus.value;
+      if (s === 'active' && !['pending', 'confirmed'].includes(r.status)) return false;
+      if (s === 'closed' && !['declined', 'cancelled'].includes(r.status)) return false;
+      if (['pending', 'confirmed'].includes(s) && r.status !== s) return false;
+      if (q) {
+        const hay = `${r.full_name} ${r.address} ${r.phone}`.toLowerCase();
+        if (!hay.includes(q) && !(qDigits.length >= 3 && (r.phone.replace(/\D/g, '').includes(qDigits) || r.phone.replace(/^\+33/, '0').replace(/\D/g, '').includes(qDigits)))) return false;
+      }
+      return true;
+    }).sort((a, b) => (a.slot_date < b.slot_date ? -1 : a.slot_date > b.slot_date ? 1 : slotRank(a.slot_time) - slotRank(b.slot_time)));
+  }
+
+  function renderStats() {
+    const today = todayParis();
+    const n = (f) => rows.filter(f).length;
+    const stats = [
+      [n((r) => r.status === 'pending'), 'À traiter'],
+      [n((r) => r.status === 'confirmed' && r.slot_date === today), 'Confirmées aujourd\'hui'],
+      [n((r) => r.status === 'confirmed' && r.slot_date > today), 'Confirmées à venir'],
+      [rows.filter((r) => r.status === 'confirmed' && r.slot_date >= today).reduce((s, r) => s + r.party_size, 0), 'Personnes à couper (à venir)'],
+    ];
+    $('#plan-stats').replaceChildren(...stats.map(([v, l]) => el('li', {}, [el('strong', { text: String(v) }), el('span', { text: l })])));
+  }
+
+  function planRow(b) {
+    const td = (label, child, cls = '') => {
+      const c = el('td', { 'data-label': label, ...(cls ? { class: cls } : {}) });
+      c.append(child);
+      return c;
+    };
+    const phone = el('a', { href: `tel:${b.phone}`, text: fmtPhone(b.phone) });
+    const addr = el('a', { href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`, target: '_blank', rel: 'noopener noreferrer', text: b.address });
+    const acts = el('div', { class: 'plan__actions' });
+    const act = (label, cls, status) => {
+      const bt = el('button', { type: 'button', class: `btn ${cls}`, text: label });
+      bt.addEventListener('click', () => setStatus(b.id, status, bt));
+      acts.append(bt);
+    };
+    if (b.status === 'pending') { act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
+    if (b.status === 'confirmed') act('Annuler', 'btn--ko', 'cancelled');
+    const tr = el('tr', { class: `row is-${b.status}` });
+    tr.append(
+      td('Heure', document.createTextNode(b.slot_time), 'plan__time'),
+      td('Client', document.createTextNode(b.full_name)),
+      td('Téléphone', phone),
+      td('Adresse', addr),
+      td('Prestation', document.createTextNode(SERVICES[b.service] || b.service)),
+      td('Personnes', document.createTextNode(peopleLabel(b.party_size))),
+      td('Statut', el('span', { class: `badge badge--${b.status}`, text: STATUS[b.status] || b.status })),
+      td('Reçue le', document.createTextNode(fmtShort(b.created_at))),
+      td('Actions', acts, 'plan__actionscell'),
+    );
+    return tr;
+  }
+
+  function renderPlanning() {
+    renderStats();
+    const shown = planFiltered();
+    const today = todayParis();
+    const out = [];
+    let day = null;
+    shown.forEach((b) => {
+      if (b.slot_date !== day) {
+        day = b.slot_date;
+        const count = shown.filter((x) => x.slot_date === day).length;
+        const th = el('th', { colspan: '9', text: `${day === today ? 'Aujourd\'hui · ' : ''}${fmtDate(day)} · ${count} ${count > 1 ? 'réservations' : 'réservation'}` });
+        out.push(el('tr', { class: `day${day === today ? ' is-today' : ''}` }, [th]));
+      }
+      out.push(planRow(b));
+    });
+    planBody.replaceChildren(...out);
+    planMsg.textContent = shown.length ? `${shown.length} réservation${shown.length > 1 ? 's' : ''}` : 'Aucune réservation pour ces filtres.';
+  }
+
+  function exportCsv() {
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['Date', 'Heure', 'Nom', 'Téléphone', 'Adresse', 'Prestation', 'Personnes', 'Statut', 'Reçue le', 'Décidée le'];
+    const lines = planFiltered().map((b) => [
+      b.slot_date, b.slot_time, b.full_name, fmtPhone(b.phone), b.address, SERVICES[b.service] || b.service, b.party_size,
+      STATUS[b.status] || b.status, b.created_at ? fmtShort(b.created_at) : '', b.decided_at ? fmtShort(b.decided_at) : '',
+    ].map(q).join(';'));
+    const blob = new Blob(['﻿' + [head.map(q).join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = el('a', { href: URL.createObjectURL(blob), download: `reservations-barber-truck-${todayParis()}.csv` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  [planPeriod, planStatus].forEach((x) => x.addEventListener('change', renderPlanning));
+  planSearch.addEventListener('input', renderPlanning);
+  $('#plan-csv').addEventListener('click', exportCsv);
+
+  /* ---- navigation entre les sections ---- */
+  function showView(name) {
+    ['requests', 'planning', 'trucks'].forEach((v) => { $(`#view-${v}`).hidden = v !== name; });
+    document.querySelectorAll('#views button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === name));
+  }
+  $('#views').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-view]');
+    if (b) showView(b.dataset.view);
+  });
 
   /* ---- check-in de position ---- */
   const ckSelect = $('#truck-select');
@@ -152,6 +276,7 @@
       const keep = ckSelect.value;
       ckSelect.replaceChildren(...trucks.map((t) => el('option', { value: t.id, text: t.name })));
       if (keep) ckSelect.value = keep;
+      ckSelect.hidden = trucks.length < 2;
       const r = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/get_truck_positions`, { method: 'POST', headers: headers(), body: '{}' });
       positions = r.ok ? await r.json() : [];
     } catch { ckMsg.textContent = 'Impossible de charger les camions.'; ckMsg.classList.add('is-error'); }

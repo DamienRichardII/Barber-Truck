@@ -49,3 +49,44 @@ select{min-height:2.7rem;padding:.5rem .7rem;border:1px solid #d4d4d0;border-rad
 .checkin__manual{margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--line)}
 .checkin__manual label{display:block;margin-bottom:.4rem;font-size:.88rem;color:var(--muted)}
 .checkin__row input{flex:1 1 12rem}
+.views{display:flex;gap:.4rem;margin-bottom:.9rem;padding:.3rem;background:#fff;border:1px solid var(--line);border-radius:.7rem;position:sticky;top:3.9rem;z-index:4}
+.views button{flex:1;padding:.6rem .5rem;border:0;border-radius:.5rem;background:transparent;font:inherit;font-weight:600;cursor:pointer}
+.views button.is-active{background:var(--ink);color:#fff}
+.views .count{background:var(--wait);color:#fff}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(8rem,1fr));gap:.5rem;margin:0 0 .8rem;padding:0;list-style:none}
+.stats li{padding:.6rem .8rem;background:#fff;border:1px solid var(--line);border-radius:.6rem}
+.stats strong{display:block;font-size:1.5rem;line-height:1.1}
+.stats span{font-size:.8rem;color:var(--muted)}
+.plan__filters{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.4rem}
+.plan__filters select,.plan__filters input{flex:1 1 11rem;min-width:0}
+.plan__wrap{overflow-x:auto}
+.plan{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:.6rem;font-size:.9rem}
+.plan th{padding:.55rem .6rem;text-align:left;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#faf9f6;border-bottom:1px solid var(--line);white-space:nowrap}
+.plan td{padding:.6rem;border-bottom:1px solid var(--line);vertical-align:top}
+.plan a{color:inherit}
+.plan tr.day th{padding:.6rem;background:var(--ink);color:#fff;font-size:.85rem;text-transform:none;letter-spacing:0}
+.plan tr.day.is-today th{background:var(--ok)}
+.plan__time{font-weight:700;white-space:nowrap}
+.plan__actions{display:flex;flex-wrap:wrap;gap:.35rem}
+.plan__actions .btn{min-height:2.2rem;padding:.3rem .7rem;font-size:.85rem}
+.plan tr.is-pending td{background:#fffaf0}
+@media (max-width:760px){
+  .plan thead{display:none}
+  .plan,.plan tbody,.plan tr,.plan td,.plan th{display:block;width:100%}
+  .plan{border:0;background:transparent}
+  .plan tr.day th{margin-top:.6rem;border-radius:.5rem .5rem 0 0}
+  .plan tr.row{margin-bottom:.5rem;background:#fff;border:1px solid var(--line);border-radius:.6rem;overflow:hidden}
+  .plan td{display:grid;grid-template-columns:6.2rem 1fr;gap:.6rem;padding:.35rem .7rem;border:0}
+  .plan td::before{content:attr(data-label);color:var(--muted);font-size:.8rem}
+  .plan td.plan__actionscell{display:block;padding:.5rem .7rem .7rem}
+  .plan td.plan__actionscell::before{content:none}
+  .plan tr.is-pending td{background:#fffaf0}
+}
+@media (max-width:760px){
+  .bar{flex-wrap:wrap;gap:.5rem .8rem}
+  .bar__actions{width:100%;margin-left:0}
+  .bar__actions .btn{flex:1}
+  .views{top:0;position:static}
+  .plan tr.day th{white-space:normal}
+  .plan td .badge{justify-self:start;width:fit-content}
+}
