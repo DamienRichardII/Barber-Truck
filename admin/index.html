@@ -31,6 +31,17 @@
     </form>
 
     <section id="panel" hidden>
+      <section class="checkin" id="checkin" aria-labelledby="checkin-title">
+        <h2 id="checkin-title">Check-in de position</h2>
+        <p class="checkin__help">Une fois par heure, appuyez sur le bouton depuis le téléphone du camion. Seule la ville est affichée sur le site (position arrondie à environ 2 km).</p>
+        <div class="checkin__row">
+          <label for="truck-select" class="sr-only">Camion</label>
+          <select id="truck-select"></select>
+          <button class="btn btn--dark" id="checkin-btn" type="button">Je suis ici</button>
+        </div>
+        <p class="msg" id="checkin-msg" role="status"></p>
+        <ul class="checkin__list" id="checkin-list"></ul>
+      </section>
       <nav class="tabs" id="tabs" aria-label="Filtrer les demandes">
         <button type="button" data-filter="pending" class="is-active">En attente <span class="count" id="count-pending">0</span></button>
         <button type="button" data-filter="confirmed">Confirmées</button>

@@ -158,3 +158,109 @@ revoke all on function public.get_taken_slots(date, date) from public;
 revoke all on function public.create_booking(text, int, date, text, text, text, text) from public;
 grant execute on function public.get_taken_slots(date, date) to anon, authenticated;
 grant execute on function public.create_booking(text, int, date, text, text, text, text) to anon, authenticated;
+
+
+-- ============================================================================
+-- Position des Barber Trucks (carte "Où sommes-nous ?")
+-- ============================================================================
+-- Sécurité : la position n'est JAMAIS enregistrée précisément. Chaque check-in est
+-- arrondi à une grille d'environ 2 km (échelle d'une ville) AVANT d'être stocké.
+-- Le site public ne peut que lire la dernière position arrondie (get_truck_positions) ;
+-- seul un compte admin peut en enregistrer une (truck_checkin).
+
+create table if not exists public.trucks (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  name       text not null unique check (char_length(name) between 2 and 60),
+  active     boolean not null default true
+);
+
+create table if not exists public.truck_checkins (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  truck_id   uuid not null references public.trucks (id) on delete cascade,
+  lat        double precision not null check (lat between -90 and 90),
+  lng        double precision not null check (lng between -180 and 180),
+  city       text check (city is null or char_length(city) <= 80)
+);
+
+create index if not exists truck_checkins_truck_time_idx on public.truck_checkins (truck_id, created_at desc);
+
+alter table public.trucks enable row level security;
+alter table public.truck_checkins enable row level security;
+revoke all on public.trucks, public.truck_checkins from anon, authenticated;
+grant select on public.trucks to authenticated;
+
+drop policy if exists "admin lit les camions" on public.trucks;
+create policy "admin lit les camions" on public.trucks
+  for select to authenticated
+  using (((select auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
+
+-- Deux camions au départ : renomme-les ensuite (update public.trucks set name = '…' where name = '…').
+insert into public.trucks (name) values ('Barber Truck 1'), ('Barber Truck 2')
+on conflict (name) do nothing;
+
+-- Dernière position (arrondie) de chaque camion actif, pour les 12 dernières heures.
+create or replace function public.get_truck_positions()
+returns table (name text, lat double precision, lng double precision, city text, checked_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select t.name, c.lat, c.lng, c.city, c.created_at
+  from public.trucks t
+  join lateral (
+    select ci.lat, ci.lng, ci.city, ci.created_at
+    from public.truck_checkins ci
+    where ci.truck_id = t.id
+      and ci.created_at > now() - interval '12 hours'
+    order by ci.created_at desc
+    limit 1
+  ) c on true
+  where t.active
+  order by t.name;
+$$;
+
+-- Check-in (admin uniquement) : arrondit la position à ~2 km avant de l'enregistrer.
+create or replace function public.truck_checkin(
+  p_truck uuid,
+  p_lat   double precision,
+  p_lng   double precision,
+  p_city  text default null
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_city text := nullif(btrim(coalesce(p_city, '')), '');
+  v_at   timestamptz;
+begin
+  if coalesce((select auth.jwt()) -> 'app_metadata' ->> 'role', '') <> 'admin' then
+    raise exception 'forbidden';
+  end if;
+  if p_lat is null or p_lng is null or p_lat not between -90 and 90 or p_lng not between -180 and 180 then
+    raise exception 'invalid_position';
+  end if;
+  if not exists (select 1 from public.trucks where id = p_truck and active) then
+    raise exception 'invalid_truck';
+  end if;
+  if v_city is not null and char_length(v_city) > 80 then
+    v_city := left(v_city, 80);
+  end if;
+
+  insert into public.truck_checkins (truck_id, lat, lng, city)
+  values (p_truck, round(round((p_lat / 0.02)::numeric) * 0.02, 2)::double precision,
+                   round(round((p_lng / 0.02)::numeric) * 0.02, 2)::double precision, v_city)
+  returning created_at into v_at;
+
+  return v_at;
+end;
+$$;
+
+revoke all on function public.get_truck_positions() from public;
+revoke all on function public.truck_checkin(uuid, double precision, double precision, text) from public;
+grant execute on function public.get_truck_positions() to anon, authenticated;
+grant execute on function public.truck_checkin(uuid, double precision, double precision, text) to authenticated;

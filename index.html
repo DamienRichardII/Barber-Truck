@@ -26,6 +26,7 @@
   <link rel="preload" href="assets/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/img/hero-van.jpg" as="image">
+  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/style.css">
   <script>document.documentElement.classList.add('js');</script>
 </head>
@@ -138,14 +139,15 @@
         <p class="eyebrow">Où sommes-nous ?</p>
         <h2 class="panel__title panel__title--sans" id="loc-title">Notre position en direct</h2>
         <p class="panel__text">Retrouvez en temps réel la position du Barber Truck<br class="br-lg"> et venez vous faire couper les cheveux près de chez vous.</p>
-        <div class="location__map" id="map" role="region" aria-label="Carte de la position du Barber Truck 93"></div>
+        <div class="location__map" id="map" role="region" aria-label="Carte de la position des Barber Trucks 93, à l'échelle de la ville"></div>
+        <p class="location__note">Position à l'échelle de la ville, actualisée toutes les heures.</p>
         <div class="location__card">
           <svg class="icon icon--pin" aria-hidden="true"><use href="#i-pin"/></svg>
-          <div class="location__info">
-            <strong>Position actuelle</strong>
-            <span>Tremblay-en-France, 93290</span>
+          <div class="location__info" id="loc-info" aria-live="polite">
+            <strong>Position des camions</strong>
+            <span id="loc-status">Position bientôt disponible</span>
           </div>
-          <a class="btn btn--dark btn--sm" href="https://www.google.com/maps/dir/?api=1&amp;destination=Tremblay-en-France+93290" target="_blank" rel="noopener noreferrer">
+          <a class="btn btn--dark btn--sm" id="loc-go" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" hidden>
             <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>
             <span>Y aller</span>
           </a>
@@ -347,6 +349,8 @@
 
   <script src="js/config.js" defer></script>
   <script src="js/api.js" defer></script>
+  <script src="assets/vendor/leaflet/leaflet.js" defer></script>
   <script src="js/main.js" defer></script>
+  <script src="js/map.js" defer></script>
 </body>
 </html>

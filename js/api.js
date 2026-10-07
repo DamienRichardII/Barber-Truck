@@ -59,7 +59,10 @@ window.BarberAPI = (() => {
     p_address: b.address,
   });
 
+  /** Dernière position (arrondie à l'échelle d'une ville) de chaque Barber Truck actif. */
+  const getTruckPositions = () => rpc('get_truck_positions', {});
+
   const message = (code) => ERRORS[code] || ERRORS.unknown;
 
-  return { isConfigured, getTakenSlots, createBooking, message };
+  return { isConfigured, getTakenSlots, createBooking, getTruckPositions, message };
 })();

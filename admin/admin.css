@@ -36,3 +36,13 @@ input{min-height:2.7rem;padding:.5rem .7rem;border:1px solid #d4d4d0;border-radi
 .card a{color:inherit}
 .card__actions{display:flex;flex-wrap:wrap;gap:.5rem}
 .card__meta{font-size:.8rem;color:var(--muted)}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+select{min-height:2.7rem;padding:.5rem .7rem;border:1px solid #d4d4d0;border-radius:.4rem;font:inherit;background:#fff}
+.checkin{margin-bottom:1rem;padding:1rem;background:#fff;border:1px solid var(--line);border-radius:.7rem}
+.checkin h2{margin:0 0 .3rem;font-size:1.05rem}
+.checkin__help{margin:0 0 .7rem;font-size:.88rem;color:var(--muted)}
+.checkin__row{display:flex;flex-wrap:wrap;gap:.5rem}
+.checkin__row select{flex:1 1 12rem}
+.checkin__list{display:grid;gap:.3rem;margin:.3rem 0 0;padding:0;list-style:none;font-size:.9rem}
+.checkin__list li.is-late{color:var(--ko);font-weight:600}
+.checkin__list li.is-ok{color:var(--ok)}

@@ -10,6 +10,10 @@
   let rows = [];
   let filter = 'pending';
   let timer = null;
+  let trucks = [];
+  let lateFlag = false;
+  let positions = [];
+  const LATE_MS = 60 * 60 * 1000;
 
   const loginForm = $('#login');
   const panel = $('#panel');
@@ -119,18 +123,99 @@
   function render() {
     const pending = rows.filter((r) => r.status === 'pending').length;
     $('#count-pending').textContent = pending;
-    document.title = `${pending ? `(${pending}) ` : ''}Administration – Barber Truck 93`;
+    document.title = `${lateFlag ? '⏰ ' : ''}${pending ? `(${pending}) ` : ''}Administration – Barber Truck 93`;
     const match = (r) => filter === 'all' || (filter === 'closed' ? ['declined', 'cancelled'].includes(r.status) : r.status === filter);
     const shown = rows.filter(match);
     listEl.replaceChildren(...shown.map(card));
     listMsg.textContent = shown.length ? '' : 'Aucune demande.';
   }
 
+  /* ---- check-in de position ---- */
+  const ckSelect = $('#truck-select');
+  const ckBtn = $('#checkin-btn');
+  const ckMsg = $('#checkin-msg');
+  const ckList = $('#checkin-list');
+  const ago = (ms) => {
+    const min = Math.max(0, Math.round(ms / 60000));
+    if (min < 2) return 'à l\'instant';
+    return min < 60 ? `il y a ${min} min` : `il y a ${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
+  };
+
+  async function fetchTrucks() {
+    try {
+      const res = await fetch(`${cfg.supabaseUrl}/rest/v1/trucks?select=id,name&active=eq.true&order=name.asc`, { headers: headers() });
+      if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
+      if (!res.ok) throw new Error();
+      trucks = await res.json();
+      const keep = ckSelect.value;
+      ckSelect.replaceChildren(...trucks.map((t) => el('option', { value: t.id, text: t.name })));
+      if (keep) ckSelect.value = keep;
+      const r = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/get_truck_positions`, { method: 'POST', headers: headers(), body: '{}' });
+      positions = r.ok ? await r.json() : [];
+    } catch { ckMsg.textContent = 'Impossible de charger les camions.'; ckMsg.classList.add('is-error'); }
+    renderCheckins();
+  }
+
+  function renderCheckins() {
+    const now = Date.now();
+    let late = false;
+    ckList.replaceChildren(...trucks.map((t) => {
+      const p = positions.find((x) => x.name === t.name);
+      const age = p ? now - new Date(p.checked_at).getTime() : Infinity;
+      const isLate = age > LATE_MS;
+      late = late || isLate;
+      const text = p ? `${t.name} : ${p.city || 'zone approximative'}, ${ago(age)}${isLate ? ' — check-in en retard' : ''}` : `${t.name} : aucun check-in récent — check-in à faire`;
+      return el('li', { class: isLate ? 'is-late' : 'is-ok', text });
+    }));
+    lateFlag = late;
+    render();
+  }
+
+  async function reverseCity(lat, lng) {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=fr&lat=${lat}&lon=${lng}`);
+      if (!res.ok) return null;
+      const a = (await res.json()).address || {};
+      return a.city || a.town || a.village || a.municipality || null;
+    } catch { return null; }
+  }
+
+  function checkin() {
+    ckMsg.classList.remove('is-error');
+    if (!trucks.length || !ckSelect.value) { ckMsg.textContent = 'Aucun camion à mettre à jour.'; ckMsg.classList.add('is-error'); return; }
+    if (!navigator.geolocation) { ckMsg.textContent = 'La géolocalisation n\'est pas disponible sur cet appareil.'; ckMsg.classList.add('is-error'); return; }
+    ckBtn.disabled = true;
+    ckMsg.textContent = 'Localisation en cours…';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      const city = await reverseCity(lat, lng);
+      try {
+        const res = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/truck_checkin`, {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({ p_truck: ckSelect.value, p_lat: lat, p_lng: lng, p_city: city }),
+        });
+        if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
+        if (!res.ok) throw new Error();
+        ckMsg.textContent = `Position envoyée${city ? ` : ${city}` : ''}. Prochain check-in dans 1 h.`;
+        await fetchTrucks();
+      } catch {
+        ckMsg.textContent = 'L\'envoi a échoué. Réessayez.'; ckMsg.classList.add('is-error');
+      }
+      ckBtn.disabled = false;
+    }, (err) => {
+      ckMsg.textContent = err.code === 1 ? 'Autorisez la localisation dans le navigateur, puis réessayez.' : 'Position introuvable. Réessayez.';
+      ckMsg.classList.add('is-error');
+      ckBtn.disabled = false;
+    }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
+  }
+  ckBtn.addEventListener('click', checkin);
+
   function start() {
     show(true);
     fetchRows();
+    fetchTrucks();
     clearInterval(timer);
-    timer = setInterval(fetchRows, 30000);
+    timer = setInterval(() => { fetchRows(); fetchTrucks(); }, 30000);
   }
 
   loginForm.addEventListener('submit', async (e) => {
