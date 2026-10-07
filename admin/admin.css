@@ -46,3 +46,6 @@ select{min-height:2.7rem;padding:.5rem .7rem;border:1px solid #d4d4d0;border-rad
 .checkin__list{display:grid;gap:.3rem;margin:.3rem 0 0;padding:0;list-style:none;font-size:.9rem}
 .checkin__list li.is-late{color:var(--ko);font-weight:600}
 .checkin__list li.is-ok{color:var(--ok)}
+.checkin__manual{margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--line)}
+.checkin__manual label{display:block;margin-bottom:.4rem;font-size:.88rem;color:var(--muted)}
+.checkin__row input{flex:1 1 12rem}

@@ -200,7 +200,8 @@ create policy "admin lit les camions" on public.trucks
 insert into public.trucks (name) values ('Barber Truck 1'), ('Barber Truck 2')
 on conflict (name) do nothing;
 
--- Dernière position (arrondie) de chaque camion actif, pour les 12 dernières heures.
+-- Dernière position (arrondie) de chaque camion actif, pour les 12 dernières heures
+-- (un camion sans check-in récent est renvoyé avec lat/lng à null).
 create or replace function public.get_truck_positions()
 returns table (name text, lat double precision, lng double precision, city text, checked_at timestamptz)
 language sql
@@ -210,7 +211,7 @@ set search_path = ''
 as $$
   select t.name, c.lat, c.lng, c.city, c.created_at
   from public.trucks t
-  join lateral (
+  left join lateral (
     select ci.lat, ci.lng, ci.city, ci.created_at
     from public.truck_checkins ci
     where ci.truck_id = t.id

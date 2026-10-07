@@ -515,7 +515,12 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .location__map{position:relative;z-index:0;overflow:hidden}
 .location__note{margin:.45rem 0 0;font-size:.72rem;color:var(--ink-soft)}
 .loc-line{display:inline}
-.truck-pin span{display:block;width:18px;height:18px;border-radius:50%;background:#8a8a86;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)}
-.truck-pin.is-live span{background:#0b0b0b;animation:truck-pulse 2.4s ease-out infinite}
-@keyframes truck-pulse{0%{box-shadow:0 0 0 0 rgba(11,11,11,.45)}70%,100%{box-shadow:0 0 0 14px rgba(11,11,11,0)}}
-@media (prefers-reduced-motion:reduce){.truck-pin.is-live span{animation:none}}
+.truck-pin{background:none;border:0}
+.truck-pin__badge{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#8a8a86;color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.truck-pin.is-live .truck-pin__badge{background:#0b0b0b;animation:truck-pulse 2.4s ease-out infinite}
+.truck-pin__badge svg{width:22px;height:22px}
+.truck-pin__badge b{position:absolute;top:-6px;right:-6px;display:grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#fff;color:#0b0b0b;font:700 11px/1 Inter,system-ui,sans-serif;border:1.5px solid #0b0b0b}
+.leaflet-tooltip.truck-label{padding:2px 7px;border:0;border-radius:4px;background:#0b0b0b;color:#fff;font:600 11px/1.3 Inter,system-ui,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.leaflet-tooltip-bottom.truck-label::before{border-bottom-color:#0b0b0b}
+@keyframes truck-pulse{0%{box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 0 0 rgba(11,11,11,.45)}70%,100%{box-shadow:0 2px 8px rgba(0,0,0,.4),0 0 0 16px rgba(11,11,11,0)}}
+@media (prefers-reduced-motion:reduce){.truck-pin.is-live .truck-pin__badge{animation:none}}

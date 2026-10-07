@@ -135,6 +135,8 @@
   const ckBtn = $('#checkin-btn');
   const ckMsg = $('#checkin-msg');
   const ckList = $('#checkin-list');
+  const cityInput = $('#city-input');
+  const cityBtn = $('#city-btn');
   const ago = (ms) => {
     const min = Math.max(0, Math.round(ms / 60000));
     if (min < 2) return 'à l\'instant';
@@ -161,10 +163,10 @@
     let late = false;
     ckList.replaceChildren(...trucks.map((t) => {
       const p = positions.find((x) => x.name === t.name);
-      const age = p ? now - new Date(p.checked_at).getTime() : Infinity;
+      const age = p && p.checked_at ? now - new Date(p.checked_at).getTime() : Infinity;
       const isLate = age > LATE_MS;
       late = late || isLate;
-      const text = p ? `${t.name} : ${p.city || 'zone approximative'}, ${ago(age)}${isLate ? ' — check-in en retard' : ''}` : `${t.name} : aucun check-in récent — check-in à faire`;
+      const text = p && p.checked_at ? `${t.name} : ${p.city || 'zone approximative'}, ${ago(age)}${isLate ? ' — check-in en retard' : ''}` : `${t.name} : aucun check-in récent — check-in à faire`;
       return el('li', { class: isLate ? 'is-late' : 'is-ok', text });
     }));
     lateFlag = late;
@@ -180,35 +182,61 @@
     } catch { return null; }
   }
 
+  async function sendCheckin(lat, lng, city) {
+    try {
+      const res = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/truck_checkin`, {
+        method: 'POST', headers: headers(),
+        body: JSON.stringify({ p_truck: ckSelect.value, p_lat: lat, p_lng: lng, p_city: city }),
+      });
+      if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
+      if (!res.ok) throw new Error();
+      ckMsg.textContent = `Position envoyée${city ? ` : ${city}` : ''}. Prochain check-in dans 1 h.`;
+      await fetchTrucks();
+    } catch {
+      ckMsg.textContent = 'L\'envoi a échoué. Réessayez.'; ckMsg.classList.add('is-error');
+    }
+  }
+
   function checkin() {
     ckMsg.classList.remove('is-error');
     if (!trucks.length || !ckSelect.value) { ckMsg.textContent = 'Aucun camion à mettre à jour.'; ckMsg.classList.add('is-error'); return; }
-    if (!navigator.geolocation) { ckMsg.textContent = 'La géolocalisation n\'est pas disponible sur cet appareil.'; ckMsg.classList.add('is-error'); return; }
+    const noGps = (msg) => { ckMsg.textContent = `${msg} Indiquez plutôt la ville ci-dessous.`; ckMsg.classList.add('is-error'); ckBtn.disabled = false; cityInput.focus(); };
+    if (!navigator.geolocation) return noGps('La géolocalisation n\'est pas disponible sur cet appareil.');
     ckBtn.disabled = true;
     ckMsg.textContent = 'Localisation en cours…';
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const { latitude: lat, longitude: lng } = pos.coords;
       const city = await reverseCity(lat, lng);
-      try {
-        const res = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/truck_checkin`, {
-          method: 'POST', headers: headers(),
-          body: JSON.stringify({ p_truck: ckSelect.value, p_lat: lat, p_lng: lng, p_city: city }),
-        });
-        if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
-        if (!res.ok) throw new Error();
-        ckMsg.textContent = `Position envoyée${city ? ` : ${city}` : ''}. Prochain check-in dans 1 h.`;
-        await fetchTrucks();
-      } catch {
-        ckMsg.textContent = 'L\'envoi a échoué. Réessayez.'; ckMsg.classList.add('is-error');
+      await sendCheckin(lat, lng, city);
+      ckBtn.disabled = false;
+    }, (err) => noGps(err.code === 1 ? 'Localisation refusée par le navigateur.' : 'Position introuvable.'),
+    { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
+  }
+
+  /* Saisie manuelle de la ville : on la géocode (centre-ville) puis on envoie comme un check-in. */
+  async function checkinCity() {
+    ckMsg.classList.remove('is-error');
+    const name = cityInput.value.trim();
+    if (!trucks.length || !ckSelect.value) { ckMsg.textContent = 'Aucun camion à mettre à jour.'; ckMsg.classList.add('is-error'); return; }
+    if (name.length < 2) { ckMsg.textContent = 'Indiquez le nom de la ville.'; ckMsg.classList.add('is-error'); cityInput.focus(); return; }
+    cityBtn.disabled = true;
+    ckMsg.textContent = 'Recherche de la ville…';
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=fr&accept-language=fr&addressdetails=1&q=${encodeURIComponent(name)}`);
+      const hit = res.ok ? (await res.json())[0] : null;
+      if (!hit) { ckMsg.textContent = 'Ville introuvable. Vérifiez l\'orthographe.'; ckMsg.classList.add('is-error'); }
+      else {
+        const a = hit.address || {};
+        const label = a.city || a.town || a.village || a.municipality || name;
+        await sendCheckin(Number(hit.lat), Number(hit.lon), label);
+        cityInput.value = '';
       }
-      ckBtn.disabled = false;
-    }, (err) => {
-      ckMsg.textContent = err.code === 1 ? 'Autorisez la localisation dans le navigateur, puis réessayez.' : 'Position introuvable. Réessayez.';
-      ckMsg.classList.add('is-error');
-      ckBtn.disabled = false;
-    }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
+    } catch { ckMsg.textContent = 'Recherche impossible. Réessayez.'; ckMsg.classList.add('is-error'); }
+    cityBtn.disabled = false;
   }
   ckBtn.addEventListener('click', checkin);
+  cityBtn.addEventListener('click', checkinCity);
+  cityInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); checkinCity(); } });
 
   function start() {
     show(true);

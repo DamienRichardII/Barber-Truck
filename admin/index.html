@@ -39,6 +39,13 @@
           <select id="truck-select"></select>
           <button class="btn btn--dark" id="checkin-btn" type="button">Je suis ici</button>
         </div>
+        <div class="checkin__manual">
+          <label for="city-input">Le GPS ne marche pas ? Indiquez la ville où vous êtes :</label>
+          <div class="checkin__row">
+            <input id="city-input" type="text" autocomplete="off" maxlength="80" placeholder="Ex. : Tremblay-en-France">
+            <button class="btn btn--ghost" id="city-btn" type="button">Envoyer cette ville</button>
+          </div>
+        </div>
         <p class="msg" id="checkin-msg" role="status"></p>
         <ul class="checkin__list" id="checkin-list"></ul>
       </section>
