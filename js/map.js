@@ -1,5 +1,6 @@
 /* Carte « Où sommes-nous ? » : position des Barber Trucks à l'échelle de la ville.
    - la position publique est déjà arrondie (~2 km) côté base de données ;
+   - pas de cercle ni de crédit sur la carte (crédit OpenStreetMap dans le pied de page) ;
    - le zoom est plafonné au niveau ville (pas de vue rue) ;
    - les positions sont rechargées toutes les 5 min (les check-ins sont horaires). */
 (() => {
@@ -11,8 +12,7 @@
   const goEl = document.getElementById('loc-go');
   const LIVE_MS = 90 * 60 * 1000;      // au-delà : « dernière position connue »
   const REFRESH_MS = 5 * 60 * 1000;
-  const ZONE_RADIUS_M = 1500;
-  const DEFAULT_VIEW = [48.93, 2.55];  // Seine-Saint-Denis (93), vue ville par défaut
+    const DEFAULT_VIEW = [48.93, 2.55];  // Seine-Saint-Denis (93), vue ville par défaut
 
   const map = L.map(mapEl, {
     center: DEFAULT_VIEW,
@@ -22,10 +22,10 @@
     scrollWheelZoom: false,
     dragging: !L.Browser.mobile,
     tap: false,
+    attributionControl: false,
   });
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 12,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
   }).addTo(map);
 
   const layer = L.layerGroup().addTo(map);
@@ -55,7 +55,6 @@
       const color = live ? '#0b0b0b' : '#8a8a86';
       const ll = [t.lat, t.lng];
       points.push(ll);
-      L.circle(ll, { radius: ZONE_RADIUS_M, color, weight: 2, fillColor: color, fillOpacity: live ? 0.16 : 0.08 }).addTo(layer);
       L.marker(ll, {
         keyboard: false,
         title: t.name,
