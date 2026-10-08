@@ -50,8 +50,8 @@
     if (!res.ok) throw new Error('Identifiants incorrects.');
     const data = await res.json();
     const role = data.user && data.user.app_metadata && data.user.app_metadata.role;
-    if (role !== 'admin') throw new Error('Ce compte n\'a pas les droits d\'administration.');
-    return { token: data.access_token, email: data.user.email };
+    if (role !== 'admin' && role !== 'barber') throw new Error('Ce compte n\'a pas les droits d\'accès.');
+    return { token: data.access_token, email: data.user.email, role };
   }
 
   async function fetchRows() {
@@ -92,7 +92,7 @@
     return n;
   }
 
-  function card(b) {
+  function card(b, readOnly) {
     const phone = el('a', { href: `tel:${b.phone}`, text: fmtPhone(b.phone) });
     const addr = el('a', { href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`, target: '_blank', rel: 'noopener noreferrer', text: b.address });
     const dl = el('dl', {}, [
@@ -107,16 +107,15 @@
       bt.addEventListener('click', () => setStatus(b.id, status, bt));
       btns.append(bt);
     };
-    if (b.status === 'pending') { act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
-    if (b.status === 'confirmed') act('Annuler le rendez-vous', 'btn--ko', 'cancelled');
+    if (!readOnly && b.status === 'pending') { act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
+    if (!readOnly && b.status === 'confirmed') act('Annuler le rendez-vous', 'btn--ko', 'cancelled');
     const created = new Date(b.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     return el('li', { class: 'card' }, [
       el('div', { class: 'card__top' }, [
         el('span', { class: 'card__when', text: `${fmtDate(b.slot_date)} · ${b.slot_time}` }),
         el('span', { class: `badge badge--${b.status}`, text: STATUS[b.status] || b.status }),
       ]),
-      dl, btns,
-      el('p', { class: 'card__meta', text: `Demande reçue le ${created}` }),
+      dl, ...(readOnly ? [] : [btns, el('p', { class: 'card__meta', text: `Demande reçue le ${created}` })]),
     ]);
   }
 
@@ -128,9 +127,10 @@
     document.title = `${lateFlag ? '⏰ ' : ''}${pending ? `(${pending}) ` : ''}Administration – Barber Truck 93`;
     const match = (r) => filter === 'all' || (filter === 'closed' ? ['declined', 'cancelled'].includes(r.status) : r.status === filter);
     const shown = rows.filter(match);
-    listEl.replaceChildren(...shown.map(card));
+    listEl.replaceChildren(...shown.map((b) => card(b)));
     listMsg.textContent = shown.length ? '' : 'Aucune demande.';
     renderPlanning();
+    if (!$('#view-barber').hidden) renderBarber();
   }
 
   /* ---- planning : toutes les réservations avec toutes leurs informations ---- */
@@ -244,9 +244,21 @@
   planSearch.addEventListener('input', renderPlanning);
   $('#plan-csv').addEventListener('click', exportCsv);
 
+  /* ---- rôles : admin = tout ; barber (coiffeur) = Camions + Coiffeur ---- */
+  const isAdmin = () => Boolean(session && session.role === 'admin');
+  function renderBarber() {
+    const today = todayParis();
+    const mine = rows.filter((r) => r.status === 'confirmed' && r.slot_date >= today)
+      .sort((a, b) => (a.slot_date < b.slot_date ? -1 : a.slot_date > b.slot_date ? 1 : slotRank(a.slot_time) - slotRank(b.slot_time)));
+    $('#barber-msg').textContent = mine.length ? '' : 'Aucun rendez-vous confirmé à venir.';
+    $('#barber-list').replaceChildren(...mine.map((b) => card(b, true)));
+  }
+
   /* ---- navigation entre les sections ---- */
   function showView(name) {
-    ['requests', 'planning', 'trucks'].forEach((v) => { $(`#view-${v}`).hidden = v !== name; });
+    if (!isAdmin() && !['trucks', 'barber'].includes(name)) name = 'barber';
+    ['requests', 'planning', 'trucks', 'barber'].forEach((v) => { $(`#view-${v}`).hidden = v !== name; });
+    if (name === 'barber') renderBarber();
     document.querySelectorAll('#views button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === name));
   }
   $('#views').addEventListener('click', (e) => {
@@ -365,6 +377,9 @@
 
   function start() {
     show(true);
+    document.querySelectorAll('[data-admin-only]').forEach((b) => { b.hidden = !isAdmin(); });
+    $('#tabs').hidden = !isAdmin();
+    showView(isAdmin() ? 'requests' : 'barber');
     fetchRows();
     fetchTrucks();
     clearInterval(timer);

@@ -90,3 +90,5 @@ select{min-height:2.7rem;padding:.5rem .7rem;border:1px solid #d4d4d0;border-rad
   .plan tr.day th{white-space:normal}
   .plan td .badge{justify-self:start;width:fit-content}
 }
+.barber__title{margin:.2rem 0 .3rem;font-size:1.2rem}
+.views button[hidden]{display:none}

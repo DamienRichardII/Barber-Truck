@@ -32,10 +32,18 @@
 
     <section id="panel" hidden>
       <nav class="views" id="views" aria-label="Sections de l'administration">
-        <button type="button" data-view="requests" class="is-active">Demandes <span class="count" id="count-pending-nav">0</span></button>
-        <button type="button" data-view="planning">Planning</button>
+        <button type="button" data-view="requests" data-admin-only class="is-active">Demandes <span class="count" id="count-pending-nav">0</span></button>
+        <button type="button" data-view="planning" data-admin-only>Planning</button>
         <button type="button" data-view="trucks">Camions</button>
+        <button type="button" data-view="barber">Coiffeur</button>
       </nav>
+
+      <div id="view-barber" hidden>
+        <h2 class="barber__title">Espace coiffeur</h2>
+        <p class="checkin__help">Vos rendez-vous confirmés à venir. Les demandes en attente sont gérées par les chefs de projet.</p>
+        <p class="msg" id="barber-msg" role="status"></p>
+        <ul class="list" id="barber-list"></ul>
+      </div>
 
       <div id="view-trucks" hidden>
       <section class="checkin" id="checkin" aria-labelledby="checkin-title">
