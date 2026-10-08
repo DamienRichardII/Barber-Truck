@@ -37,7 +37,7 @@
     const live = Date.now() - t.at <= LIVE_MS;
     const sub = live ? 'Actuellement ici' : `Dernière position · ${fmtAgo(Date.now() - t.at)}`;
     return `<span class="tp-card"><strong>${escapeHtml(t.name)}</strong><span>${escapeHtml(sub)}</span><span>${escapeHtml(t.city || 'Zone approximative')}</span></span>`
-      + '<img class="tp-photo" src="assets/img/truck-pin.jpg" alt="" width="40" height="40" decoding="async">';
+      + '<img class="tp-photo" src="assets/img/truck-pin.jpg" alt="" width="32" height="32" decoding="async">';
   }
   const isLive = (t) => Date.now() - t.at <= LIVE_MS;
 
@@ -253,7 +253,7 @@
           L.marker(ll, {
             keyboard: false,
             title: t.name,
-            icon: L.divIcon({ className: `truck-pin${isLive(t) ? ' is-live' : ''}`, html: truckPin(t), iconSize: [40, 40], iconAnchor: [20, 20] }),
+            icon: L.divIcon({ className: `truck-pin${isLive(t) ? ' is-live' : ''}`, html: truckPin(t), iconSize: [32, 32], iconAnchor: [16, 16] }),
           }).addTo(layer);
         });
         if (points.length === 1) map.setView(points[0], MAX_ZOOM);

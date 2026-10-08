@@ -532,18 +532,18 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 
 /* repère camion : carte blanche + photo ronde (comme la maquette) */
 .truck-pin{background:none;border:0}
-.truck-pin,.gm-truck{position:absolute;width:40px;height:40px;overflow:visible}
+.truck-pin,.gm-truck{position:absolute;width:32px;height:32px;overflow:visible}
 .gm-truck{transform:translate(-50%,-50%)}
 .location__map.is-mapbox .gm-truck{transform:none}
-.tp-photo{position:absolute;right:0;top:0;width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #fff;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.35)}
-.tp-card{position:absolute;right:21px;top:50%;transform:translateY(-50%);display:grid;gap:0;min-width:5.6rem;padding:.35rem 1.7rem .35rem .55rem;border-radius:.45rem;background:#fff;color:#0b0b0b;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.22);font:400 .58rem/1.25 Inter,system-ui,sans-serif}
-.tp-card strong{font-weight:700;font-size:.64rem}
+.tp-photo{position:absolute;right:0;top:0;width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid #fff;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.35)}
+.tp-card{position:absolute;right:17px;top:50%;transform:translateY(-50%);display:grid;gap:0;min-width:0;padding:.28rem 1.45rem .28rem .45rem;border-radius:.4rem;background:#fff;color:#0b0b0b;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.22);font:400 .5rem/1.25 Inter,system-ui,sans-serif}
+.tp-card strong{font-weight:700;font-size:.56rem}
 .tp-card span{color:#4a4a47}
 .truck-pin.is-live .tp-photo{animation:truck-pulse 2.4s ease-out infinite}
 .truck-pin:not(.is-live) .tp-photo{filter:grayscale(1)}
 @keyframes truck-pulse{0%{box-shadow:0 3px 12px rgba(0,0,0,.35),0 0 0 0 rgba(255,255,255,.7)}70%,100%{box-shadow:0 3px 12px rgba(0,0,0,.35),0 0 0 16px rgba(255,255,255,0)}}
 @media (prefers-reduced-motion:reduce){.truck-pin.is-live .tp-photo{animation:none}}
-@media (max-width:520px){.tp-card{min-width:5rem;padding:.3rem 1.5rem .3rem .45rem;font-size:.54rem}.tp-card strong{font-size:.6rem}}
+@media (max-width:520px){.tp-card{padding:.24rem 1.3rem .24rem .4rem;font-size:.47rem}.tp-card strong{font-size:.52rem}}
 
 /* carte OpenFreeMap (MapLibre) */
 .location__map.is-openfreemap{background:#111}
