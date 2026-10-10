@@ -147,3 +147,16 @@ body:has(#login:not([hidden])) .bar{background:transparent;border-bottom:0;posit
   .views button{padding:.6rem .55rem;font-size:.9rem}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Onglets de connexion + création de compte */
+.auth{max-width:24rem;margin:0 auto}
+.auth__tabs{display:flex;gap:.3rem;margin:max(6vh,1rem) 0 0;padding:.3rem;background:#1a1a1a;border-radius:.9rem}
+.auth__tabs button{flex:1;min-height:2.7rem;border:0;border-radius:.65rem;background:transparent;color:#bdbdb8;font:inherit;font-weight:600;cursor:pointer}
+.auth__tabs button.is-active{background:#fff;color:var(--ink)}
+.auth .login{margin-top:.8rem}
+.login__alt{margin:.8rem 0 0;font-size:.9rem;color:var(--muted);text-align:center}
+.login__note{margin:0 0 .4rem;font-size:.9rem;color:var(--muted)}
+.link{padding:0;border:0;background:none;color:var(--ink);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
+.badge--pending{background:#f1efe6;color:var(--wait)}
+body:has(#auth:not([hidden])){background:#0b0b0b}
+body:has(#auth:not([hidden])) .bar{background:transparent;border-bottom:0;position:static}

@@ -15,7 +15,9 @@
   let positions = [];
   const LATE_MS = 60 * 60 * 1000;
 
+  const auth = $('#auth');
   const loginForm = $('#login');
+  let loginRole = 'admin';
   const panel = $('#panel');
   const actions = $('#bar-actions');
   const listEl = $('#list');
@@ -27,7 +29,7 @@
   const headers = () => ({ apikey: cfg.supabaseKey, Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' });
 
   function show(loggedIn) {
-    loginForm.hidden = loggedIn;
+    auth.hidden = loggedIn;
     panel.hidden = !loggedIn;
     actions.hidden = !loggedIn;
   }
@@ -50,7 +52,12 @@
     if (!res.ok) throw new Error('Identifiants incorrects.');
     const data = await res.json();
     const role = data.user && data.user.app_metadata && data.user.app_metadata.role;
-    if (role !== 'admin' && role !== 'barber') throw new Error('Ce compte n\'a pas les droits d\'accès.');
+    if (loginRole === 'admin' && role !== 'admin') throw new Error(role === 'barber' ? 'Ce compte est un compte barber : utilisez l\'onglet « Barber ».' : 'Ce compte n\'a pas les droits d\'accès.');
+    if (loginRole === 'barber') {
+      if (role === 'barber_pending') throw new Error('Votre compte est en attente de validation par un chef de projet.');
+      if (role === 'barber_revoked') throw new Error('L\'accès de ce compte a été retiré. Contactez un chef de projet.');
+      if (role !== 'barber') throw new Error(role === 'admin' ? 'Ce compte est un compte chef de projet : utilisez l\'onglet « Chef de projet ».' : 'Ce compte n\'a pas les droits d\'accès.');
+    }
     return { token: data.access_token, email: data.user.email, role };
   }
 
@@ -255,11 +262,49 @@
     $('#barber-list').replaceChildren(...mine.map((b) => card(b, true)));
   }
 
+  /* ---- comptes barber (chefs de projet) ---- */
+  const FN = `${cfg.supabaseUrl}/functions/v1/barber-accounts`;
+  const ROLE_LABEL = { barber_pending: 'En attente', barber: 'Actif', barber_revoked: 'Accès retiré' };
+  async function barberCall(body, token) {
+    const res = await fetch(FN, { method: 'POST', headers: { apikey: cfg.supabaseKey, Authorization: `Bearer ${token || (session && session.token) || cfg.supabaseKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    let data = {}; try { data = await res.json(); } catch { /* vide */ }
+    if (!res.ok) throw Object.assign(new Error(data.error || 'server'), { code: data.error || 'server' });
+    return data;
+  }
+  async function loadBarbers() {
+    const msg = $('#barbers-msg'); msg.classList.remove('is-error');
+    try {
+      const { barbers } = await barberCall({ action: 'list' });
+      const order = { barber_pending: 0, barber: 1, barber_revoked: 2 };
+      barbers.sort((a, b) => order[a.role] - order[b.role] || a.created_at.localeCompare(b.created_at));
+      const waiting = barbers.filter((b) => b.role === 'barber_pending').length;
+      const badge = $('#count-barbers'); badge.textContent = waiting; badge.hidden = !waiting;
+      msg.textContent = barbers.length ? '' : 'Aucun compte barber pour le moment.';
+      $('#barbers-list').replaceChildren(...barbers.map((b) => {
+        const btns = el('div', { class: 'card__actions' });
+        const act = (label, cls, action) => {
+          const bt = el('button', { type: 'button', class: `btn ${cls}`, text: label });
+          bt.addEventListener('click', async () => { bt.disabled = true; try { await barberCall({ action, id: b.id }); await loadBarbers(); } catch { msg.textContent = 'Action impossible, réessayez.'; msg.classList.add('is-error'); bt.disabled = false; } });
+          btns.append(bt);
+        };
+        if (b.role === 'barber_pending') { act('Valider', 'btn--ok', 'approve'); act('Refuser', 'btn--ko', 'reject'); }
+        if (b.role === 'barber') act('Retirer l\'accès', 'btn--ko', 'revoke');
+        if (b.role === 'barber_revoked') act('Réactiver', 'btn--ok', 'approve');
+        return el('li', { class: 'card' }, [
+          el('div', { class: 'card__top' }, [el('span', { class: 'card__when', text: b.name || b.email }), el('span', { class: `badge badge--${b.role === 'barber' ? 'confirmed' : b.role === 'barber_pending' ? 'pending' : 'cancelled'}`, text: ROLE_LABEL[b.role] })]),
+          el('p', { class: 'card__meta', text: `${b.email} · demande du ${new Date(b.created_at).toLocaleDateString('fr-FR')}` }),
+          btns,
+        ]);
+      }));
+    } catch { msg.textContent = 'Impossible de charger les comptes barber.'; msg.classList.add('is-error'); }
+  }
+
   /* ---- navigation entre les sections ---- */
   function showView(name) {
     if (!isAdmin() && !['trucks', 'barber'].includes(name)) name = 'barber';
-    ['requests', 'planning', 'trucks', 'barber'].forEach((v) => { $(`#view-${v}`).hidden = v !== name; });
+    ['requests', 'planning', 'trucks', 'barber', 'barbers'].forEach((v) => { $(`#view-${v}`).hidden = v !== name; });
     if (name === 'barber') renderBarber();
+    if (name === 'barbers') loadBarbers();
     document.querySelectorAll('#views button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === name));
   }
   $('#views').addEventListener('click', (e) => {
@@ -405,6 +450,33 @@
     }
   });
   $('#logout').addEventListener('click', () => logout());
+
+  /* onglets de connexion + création de compte barber */
+  const signupForm = $('#signup');
+  function setLoginRole(r) {
+    loginRole = r;
+    document.querySelectorAll('#auth-tabs button').forEach((b) => { const on = b.dataset.role === r; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on)); });
+    $('#login-title').textContent = r === 'admin' ? 'Connexion chef de projet' : 'Connexion barber';
+    $('#to-signup').hidden = r !== 'barber';
+    loginForm.hidden = false; signupForm.hidden = true;
+    $('#login-msg').textContent = '';
+  }
+  $('#auth-tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-role]'); if (b) setLoginRole(b.dataset.role); });
+  $('#show-signup').addEventListener('click', () => { loginForm.hidden = true; signupForm.hidden = false; $('#signup-msg').textContent = ''; });
+  $('#back-login').addEventListener('click', () => setLoginRole('barber'));
+  const SIGNUP_ERR = { invalid_name: 'Merci d\'indiquer votre nom et prénom.', invalid_email: 'Adresse e-mail invalide.', weak_password: 'Mot de passe : 10 caractères minimum.', email_taken: 'Un compte existe déjà avec cet e-mail.', too_many_requests: 'Trop de demandes en attente, réessayez plus tard.' };
+  signupForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('#signup-msg'); msg.classList.remove('is-error');
+    if ($('#su-pass').value !== $('#su-pass2').value) { msg.textContent = 'Les deux mots de passe ne correspondent pas.'; msg.classList.add('is-error'); return; }
+    msg.textContent = 'Envoi…';
+    try {
+      await barberCall({ action: 'signup', name: $('#su-name').value, email: $('#su-email').value, password: $('#su-pass').value, website: $('#su-website').value });
+      signupForm.reset();
+      setLoginRole('barber');
+      const lm = $('#login-msg'); lm.textContent = 'Demande envoyée. Un chef de projet doit la valider avant votre première connexion.'; lm.classList.remove('is-error');
+    } catch (err) { msg.textContent = SIGNUP_ERR[err.code] || 'Une erreur est survenue, réessayez.'; msg.classList.add('is-error'); }
+  });
   $('#refresh').addEventListener('click', fetchRows);
   $('#tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-filter]');
@@ -415,5 +487,8 @@
   });
 
   session = loadSession();
+  if (session && !session.role) {
+    try { session.role = (JSON.parse(atob(session.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).app_metadata || {}).role; } catch { session = null; }
+  }
   if (session && cfg.supabaseUrl) start();
 })();

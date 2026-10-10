@@ -21,23 +21,55 @@
   </header>
 
   <main>
+    <div class="auth" id="auth">
+    <div class="auth__tabs" id="auth-tabs" role="tablist" aria-label="Type de compte">
+      <button type="button" role="tab" data-role="admin" class="is-active" aria-selected="true">Chef de projet</button>
+      <button type="button" role="tab" data-role="barber" aria-selected="false">Barber</button>
+    </div>
     <form class="login" id="login" novalidate>
-      <h2>Connexion</h2>
+      <h2 id="login-title">Connexion chef de projet</h2>
       <label for="email">E-mail</label>
       <input id="email" type="email" autocomplete="username" required>
       <label for="password">Mot de passe</label>
       <input id="password" type="password" autocomplete="current-password" required>
       <button class="btn btn--dark" type="submit">Se connecter</button>
       <p class="msg" id="login-msg" role="alert"></p>
+      <p class="login__alt" id="to-signup" hidden>Pas encore de compte ? <button type="button" class="link" id="show-signup">Créer un compte barber</button></p>
     </form>
+
+    <form class="login" id="signup" novalidate hidden>
+      <h2>Créer un compte barber</h2>
+      <p class="login__note">Votre demande sera validée par un chef de projet avant votre première connexion.</p>
+      <label for="su-name">Nom et prénom</label>
+      <input id="su-name" type="text" autocomplete="name" required minlength="2" maxlength="80">
+      <label for="su-email">E-mail</label>
+      <input id="su-email" type="email" autocomplete="email" required maxlength="120">
+      <label for="su-pass">Mot de passe (10 caractères minimum)</label>
+      <input id="su-pass" type="password" autocomplete="new-password" required minlength="10" maxlength="72">
+      <label for="su-pass2">Confirmer le mot de passe</label>
+      <input id="su-pass2" type="password" autocomplete="new-password" required minlength="10" maxlength="72">
+      <input id="su-website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+      <button class="btn btn--dark" type="submit">Envoyer ma demande</button>
+      <p class="msg" id="signup-msg" role="alert"></p>
+      <p class="login__alt"><button type="button" class="link" id="back-login">← Retour à la connexion</button></p>
+    </form>
+    </div>
 
     <section id="panel" hidden>
       <nav class="views" id="views" aria-label="Sections de l'administration">
         <button type="button" data-view="requests" data-admin-only class="is-active">Demandes <span class="count" id="count-pending-nav">0</span></button>
         <button type="button" data-view="planning" data-admin-only>Planning</button>
         <button type="button" data-view="trucks">Camions</button>
+        <button type="button" data-view="barbers" data-admin-only>Barbers <span class="count" id="count-barbers" hidden>0</span></button>
         <button type="button" data-view="barber">Coiffeur</button>
       </nav>
+
+      <div id="view-barbers" hidden>
+        <h2 class="barber__title">Comptes barber</h2>
+        <p class="checkin__help">Validez les demandes de création de compte. Un barber n'a accès qu'aux sections Camions et Coiffeur.</p>
+        <p class="msg" id="barbers-msg" role="status"></p>
+        <ul class="list" id="barbers-list"></ul>
+      </div>
 
       <div id="view-barber" hidden>
         <h2 class="barber__title">Espace coiffeur</h2>
