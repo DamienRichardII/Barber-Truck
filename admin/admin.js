@@ -72,6 +72,25 @@
     render();
   }
 
+  /* Confirmer à la place du client déjà confirmé (annule l'autre, en une seule opération). */
+  async function replaceConfirmed(id, button) {
+    button.disabled = true;
+    const res = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/confirm_booking_replacing`, { method: 'POST', headers: headers(), body: JSON.stringify({ p_id: id }) });
+    if (res.status === 401) return logout('Session expirée, reconnectez-vous.');
+    if (!res.ok) { listMsg.textContent = 'Le remplacement a échoué.'; listMsg.classList.add('is-error'); button.disabled = false; return; }
+    await fetchRows();
+  }
+  function replaceButton(b, container) {
+    const bt = el('button', { type: 'button', class: 'btn btn--ok', text: 'Confirmer à la place' });
+    let armed = null;
+    bt.addEventListener('click', () => {
+      if (armed) { clearTimeout(armed); armed = null; replaceConfirmed(b.id, bt); return; }
+      bt.textContent = 'Valider : annule l\'autre client';
+      armed = setTimeout(() => { armed = null; bt.textContent = 'Confirmer à la place'; }, 5000);
+    });
+    container.append(bt);
+  }
+
   async function setStatus(id, status, button) {
     button.disabled = true;
     const res = await fetch(`${cfg.supabaseUrl}/rest/v1/bookings?id=eq.${encodeURIComponent(id)}`, {
@@ -104,7 +123,7 @@
   const slotTaken = (b) => b.status === 'pending' && sameSlot(b).some((r) => r.status === 'confirmed');
   function slotNote(b) {
     if (b.status !== 'pending') return '';
-    if (slotTaken(b)) return 'Créneau déjà confirmé pour un autre client.';
+    if (slotTaken(b)) { const c = sameSlot(b).find((r) => r.status === 'confirmed'); return `Créneau déjà confirmé pour ${c.full_name}. Vous pouvez le remplacer : l'autre client sera annulé.`; }
     const n = sameSlot(b).filter((r) => r.status === 'pending').length;
     return n ? `${n} autre${n > 1 ? 's' : ''} demande${n > 1 ? 's' : ''} pour ce créneau : confirmez celle de votre choix.` : '';
   }
@@ -125,7 +144,7 @@
       bt.addEventListener('click', () => setStatus(b.id, status, bt));
       btns.append(bt);
     };
-    if (!readOnly && b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
+    if (!readOnly && b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, btns); act('Refuser', 'btn--ko', 'declined'); }
     if (!readOnly && b.status === 'confirmed') act('Annuler le rendez-vous', 'btn--ko', 'cancelled');
     const created = new Date(b.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     return el('li', { class: 'card' }, [
@@ -210,7 +229,7 @@
       bt.addEventListener('click', () => setStatus(b.id, status, bt));
       acts.append(bt);
     };
-    if (b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
+    if (b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, acts); act('Refuser', 'btn--ko', 'declined'); }
     if (b.status === 'confirmed') act('Annuler', 'btn--ko', 'cancelled');
     if (slotNote(b)) acts.append(el('p', { class: `card__note${slotTaken(b) ? ' is-ko' : ''}`, text: slotNote(b) }));
     const tr = el('tr', { class: `row is-${b.status}` });
