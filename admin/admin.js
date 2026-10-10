@@ -98,6 +98,7 @@
     const dl = el('dl', {}, [
       el('dt', { text: 'Client' }), el('dd', { text: b.full_name }),
       el('dt', { text: 'Téléphone' }), el('dd', {}, [phone]),
+      ...(b.email ? [el('dt', { text: 'E-mail' }), el('dd', {}, [el('a', { href: `mailto:${b.email}`, text: b.email })])] : []),
       el('dt', { text: 'Adresse' }), el('dd', {}, [addr]),
       el('dt', { text: 'Prestation' }), el('dd', { text: `${SERVICES[b.service] || b.service} · ${b.party_size} ${b.party_size > 1 ? 'personnes' : 'personne'}` }),
     ]);

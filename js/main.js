@@ -255,6 +255,7 @@
       const checks = [
         [f.name, f.name.value.trim().length >= 2, 'Merci d\'indiquer votre nom et prénom.'],
         [f.phone, /^\+?\d{9,15}$/.test(phone), 'Merci d\'indiquer un numéro de téléphone valide.'],
+        [f.email, /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.value.trim()), 'Merci d\'indiquer une adresse e-mail valide.'],
         [f.address, f.address.value.trim().length >= 8, 'Merci d\'indiquer votre adresse complète.'],
       ];
       {
@@ -274,6 +275,7 @@
       return {
         name: f.name.value.trim(),
         phone,
+        email: f.email.value.trim().toLowerCase(),
         address: f.address.value.trim(),
         partySize: Number(f.party.value),
       };
@@ -357,12 +359,13 @@
           time: sent.time,
           name: contact.name,
           phone: contact.phone,
+          email: contact.email,
           address: contact.address,
         });
         state.taken.set(`${iso(sent.date)}|${sent.time}`, 'pending');
         form.hidden = true;
         doneText.textContent = `${state.serviceLabel} · ${cap(longDate(sent.date))} à ${sent.time}. `
-          + `Votre créneau est en attente de confirmation de notre part. Nous vous contactons au ${contact.phone} pour le valider.`;
+          + `Votre créneau est en attente de confirmation de notre part. Vous recevrez un e-mail à ${contact.email} dès qu'il est confirmé.`;
         doneEl.hidden = false;
         setStep(3);
         steps.forEach((li) => li.classList.add('is-done'));

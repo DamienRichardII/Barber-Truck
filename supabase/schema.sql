@@ -19,6 +19,7 @@ create table if not exists public.bookings (
   slot_time   text not null check (slot_time in ('18h00','19h00','20h00','21h00','22h00','23h00','00h00','01h00','02h00')),
   full_name   text not null check (char_length(full_name) between 2 and 80),
   phone       text not null check (phone ~ '^\+?[0-9]{9,15}$'),
+  email       text check (email is null or email ~ '^[^\s@]+@[^\s@]+\.[^\s@]{2,}$'),
   address     text not null check (char_length(address) between 8 and 200),
   status      text not null default 'pending' check (status in ('pending', 'confirmed', 'declined', 'cancelled')),
   constraint bookings_party_ck check (
@@ -91,6 +92,7 @@ create or replace function public.create_booking(
   p_time       text,
   p_name       text,
   p_phone      text,
+  p_email      text,
   p_address    text
 )
 returns uuid
@@ -103,6 +105,7 @@ declare
   v_today date := (now() at time zone 'Europe/Paris')::date;
   v_phone text := regexp_replace(coalesce(p_phone, ''), '[^0-9+]', '', 'g');
   v_name  text := btrim(coalesce(p_name, ''));
+  v_email text := lower(btrim(coalesce(p_email, '')));
   v_addr  text := btrim(coalesce(p_address, ''));
   v_size  int;
 begin
@@ -120,6 +123,9 @@ begin
   end if;
   if v_phone !~ '^\+?[0-9]{9,15}$' then
     raise exception 'invalid_phone';
+  end if;
+  if v_email !~ '^[^\s@]+@[^\s@]+\.[^\s@]{2,}$' or char_length(v_email) > 120 then
+    raise exception 'invalid_email';
   end if;
   if char_length(v_addr) < 8 or char_length(v_addr) > 200 then
     raise exception 'invalid_address';
@@ -143,8 +149,8 @@ begin
   end if;
 
   begin
-    insert into public.bookings (service, party_size, slot_date, slot_time, full_name, phone, address)
-    values (p_service, v_size, p_date, p_time, v_name, v_phone, v_addr)
+    insert into public.bookings (service, party_size, slot_date, slot_time, full_name, phone, email, address)
+    values (p_service, v_size, p_date, p_time, v_name, v_phone, v_email, v_addr)
     returning id into v_id;
   exception when unique_violation then
     raise exception 'slot_taken';
@@ -155,9 +161,9 @@ end;
 $$;
 
 revoke all on function public.get_taken_slots(date, date) from public;
-revoke all on function public.create_booking(text, int, date, text, text, text, text) from public;
+revoke all on function public.create_booking(text, int, date, text, text, text, text, text) from public;
 grant execute on function public.get_taken_slots(date, date) to anon, authenticated;
-grant execute on function public.create_booking(text, int, date, text, text, text, text) to anon, authenticated;
+grant execute on function public.create_booking(text, int, date, text, text, text, text, text) to anon, authenticated;
 
 
 -- ============================================================================

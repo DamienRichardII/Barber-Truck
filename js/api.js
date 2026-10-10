@@ -9,6 +9,7 @@ window.BarberAPI = (() => {
     slot_taken: 'Ce créneau vient d\'être pris. Merci d\'en choisir un autre.',
     invalid_phone: 'Numéro de téléphone invalide.',
     invalid_name: 'Merci d\'indiquer votre nom et prénom.',
+    invalid_email: 'Merci d\'indiquer une adresse e-mail valide.',
     invalid_address: 'Merci d\'indiquer une adresse complète.',
     invalid_party_size: 'Nombre de personnes invalide pour cette prestation.',
     invalid_date: 'Cette date n\'est pas disponible.',
@@ -56,6 +57,7 @@ window.BarberAPI = (() => {
     p_time: b.time,
     p_name: b.name,
     p_phone: b.phone,
+    p_email: b.email,
     p_address: b.address,
   });
 
