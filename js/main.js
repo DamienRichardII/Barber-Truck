@@ -362,7 +362,6 @@
           email: contact.email,
           address: contact.address,
         });
-        state.taken.set(`${iso(sent.date)}|${sent.time}`, 'pending');
         form.hidden = true;
         doneText.textContent = `${state.serviceLabel} · ${cap(longDate(sent.date))} à ${sent.time}. `
           + `Votre créneau est en attente de confirmation de notre part. Vous recevrez un e-mail à ${contact.email} dès qu'il est confirmé.`;

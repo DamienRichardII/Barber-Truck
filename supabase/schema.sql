@@ -27,11 +27,12 @@ create table if not exists public.bookings (
   )
 );
 
--- Un créneau ne peut être occupé que par une seule demande active (en attente ou confirmée).
+-- Plusieurs clients peuvent demander le même créneau (statut 'pending') : seuls les chefs de projet choisissent.
+-- Un créneau n'est bloqué que s'il est CONFIRMÉ (une seule demande confirmée par créneau).
 -- Refusée / annulée => le créneau redevient libre.
-create unique index if not exists bookings_slot_active_uidx
+create unique index if not exists bookings_slot_confirmed_uidx
   on public.bookings (slot_date, slot_time)
-  where status in ('pending', 'confirmed');
+  where status = 'confirmed';
 
 create index if not exists bookings_status_date_idx on public.bookings (status, slot_date, slot_time);
 
@@ -80,7 +81,7 @@ set search_path = ''
 as $$
   select b.slot_date, b.slot_time, b.status
   from public.bookings b
-  where b.status in ('pending', 'confirmed')
+  where b.status = 'confirmed'
     and b.slot_date between p_from and least(p_to, p_from + 62);
 $$;
 

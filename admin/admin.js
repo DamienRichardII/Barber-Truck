@@ -80,7 +80,7 @@
       body: JSON.stringify({ status }),
     });
     if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
-    if (res.status === 409) { listMsg.textContent = 'Ce créneau est déjà occupé par une autre demande active.'; listMsg.classList.add('is-error'); button.disabled = false; return; }
+    if (res.status === 409) { listMsg.textContent = 'Ce créneau est déjà confirmé pour un autre client.'; listMsg.classList.add('is-error'); button.disabled = false; return; }
     if (!res.ok) { listMsg.textContent = 'La modification a échoué.'; listMsg.classList.add('is-error'); button.disabled = false; return; }
     await fetchRows();
   }
@@ -99,6 +99,16 @@
     return n;
   }
 
+  /* Plusieurs demandes peuvent viser le même horaire : seul un créneau confirmé est bloqué. */
+  const sameSlot = (b) => rows.filter((r) => r.id !== b.id && r.slot_date === b.slot_date && r.slot_time === b.slot_time);
+  const slotTaken = (b) => b.status === 'pending' && sameSlot(b).some((r) => r.status === 'confirmed');
+  function slotNote(b) {
+    if (b.status !== 'pending') return '';
+    if (slotTaken(b)) return 'Créneau déjà confirmé pour un autre client.';
+    const n = sameSlot(b).filter((r) => r.status === 'pending').length;
+    return n ? `${n} autre${n > 1 ? 's' : ''} demande${n > 1 ? 's' : ''} pour ce créneau : confirmez celle de votre choix.` : '';
+  }
+
   function card(b, readOnly) {
     const phone = el('a', { href: `tel:${b.phone}`, text: fmtPhone(b.phone) });
     const addr = el('a', { href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`, target: '_blank', rel: 'noopener noreferrer', text: b.address });
@@ -115,7 +125,7 @@
       bt.addEventListener('click', () => setStatus(b.id, status, bt));
       btns.append(bt);
     };
-    if (!readOnly && b.status === 'pending') { act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
+    if (!readOnly && b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
     if (!readOnly && b.status === 'confirmed') act('Annuler le rendez-vous', 'btn--ko', 'cancelled');
     const created = new Date(b.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     return el('li', { class: 'card' }, [
@@ -123,7 +133,7 @@
         el('span', { class: 'card__when', text: `${fmtDate(b.slot_date)} · ${b.slot_time}` }),
         el('span', { class: `badge badge--${b.status}`, text: STATUS[b.status] || b.status }),
       ]),
-      dl, ...(readOnly ? [] : [btns, el('p', { class: 'card__meta', text: `Demande reçue le ${created}` })]),
+      dl, ...(readOnly ? [] : [...(slotNote(b) ? [el('p', { class: `card__note${slotTaken(b) ? ' is-ko' : ''}`, text: slotNote(b) })] : []), btns, el('p', { class: 'card__meta', text: `Demande reçue le ${created}` })]),
     ]);
   }
 
@@ -200,8 +210,9 @@
       bt.addEventListener('click', () => setStatus(b.id, status, bt));
       acts.append(bt);
     };
-    if (b.status === 'pending') { act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
+    if (b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); act('Refuser', 'btn--ko', 'declined'); }
     if (b.status === 'confirmed') act('Annuler', 'btn--ko', 'cancelled');
+    if (slotNote(b)) acts.append(el('p', { class: `card__note${slotTaken(b) ? ' is-ko' : ''}`, text: slotNote(b) }));
     const tr = el('tr', { class: `row is-${b.status}` });
     tr.append(
       td('Heure', document.createTextNode(b.slot_time), 'plan__time'),

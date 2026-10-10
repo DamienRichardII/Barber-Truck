@@ -160,3 +160,6 @@ body:has(#login:not([hidden])) .bar{background:transparent;border-bottom:0;posit
 .badge--pending{background:#f1efe6;color:var(--wait)}
 body:has(#auth:not([hidden])){background:#0b0b0b}
 body:has(#auth:not([hidden])) .bar{background:transparent;border-bottom:0;position:static}
+.card__note{margin:0;padding:.5rem .7rem;border-radius:.6rem;background:#fff6e0;color:#7a5500;font-size:.85rem;font-weight:500}
+.card__note.is-ko{background:#f9e6e4;color:var(--ko)}
+.plan__actions .card__note{flex-basis:100%}
