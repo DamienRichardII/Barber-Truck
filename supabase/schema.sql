@@ -273,3 +273,30 @@ revoke all on function public.get_truck_positions() from public;
 revoke all on function public.truck_checkin(uuid, double precision, double precision, text) from public;
 grant execute on function public.get_truck_positions() to anon, authenticated;
 grant execute on function public.truck_checkin(uuid, double precision, double precision, text) to authenticated;
+
+-- Un chef de projet confirme une demande à la place du client déjà confirmé sur le même horaire
+-- (le premier passe en 'cancelled', une seule opération). Réservé au rôle admin.
+create or replace function public.confirm_booking_replacing(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  b public.bookings;
+begin
+  if coalesce((select auth.jwt()) -> 'app_metadata' ->> 'role', '') <> 'admin' then
+    raise exception 'forbidden';
+  end if;
+  select * into b from public.bookings where id = p_id for update;
+  if b.id is null or b.status <> 'pending' then
+    raise exception 'invalid_booking';
+  end if;
+  update public.bookings set status = 'cancelled'
+   where slot_date = b.slot_date and slot_time = b.slot_time and status = 'confirmed' and id <> p_id;
+  update public.bookings set status = 'confirmed' where id = p_id;
+end;
+$$;
+
+revoke execute on function public.confirm_booking_replacing(uuid) from public, anon;
+grant execute on function public.confirm_booking_replacing(uuid) to authenticated;
