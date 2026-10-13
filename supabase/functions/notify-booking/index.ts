@@ -1,12 +1,16 @@
-// Envoi des e-mails Resend : nouvelle demande (équipe + client), confirmation, annulation / refus (client).
+// Envoi des e-mails Resend + SMS Brevo : nouvelle demande (équipe + client), confirmation, annulation / refus (client).
 // Appelée par le trigger `bookings_notify` (voir supabase/notifications.sql).
 // Secrets requis : RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO, WEBHOOK_SECRET, SITE_URL (optionnel).
+// SMS (optionnels, désactivés sans BREVO_API_KEY) : BREVO_API_KEY, SMS_SENDER, NOTIFY_SMS_TO (numéros équipe, séparés par des virgules).
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const FROM = Deno.env.get('NOTIFY_FROM') ?? 'Barber Truck 93 <onboarding@resend.dev>';
 const TO_TEAM = (Deno.env.get('NOTIFY_TO') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const SECRET = Deno.env.get('WEBHOOK_SECRET') ?? '';
 const SITE = Deno.env.get('SITE_URL') ?? 'https://barbertruck.vercel.app';
+const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') ?? '';
+const SMS_SENDER = Deno.env.get('SMS_SENDER') ?? 'BarberTruck';
+const SMS_TEAM = (Deno.env.get('NOTIFY_SMS_TO') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 type Booking = {
   id: string; status: 'pending' | 'confirmed' | 'declined' | 'cancelled';
@@ -46,6 +50,22 @@ async function send(to: string[], subject: string, html: string, replyTo?: strin
   if (!res.ok) console.error('Resend', res.status, await res.text());
 }
 
+// 06 12 34 56 78 -> 33612345678 (format attendu par Brevo, sans le +)
+const intl = (p: string) => p.replace(/[^0-9+]/g, '').replace(/^\+/, '').replace(/^00/, '').replace(/^0/, '33');
+
+// Un SMS ne doit jamais bloquer les e-mails : toute erreur est seulement journalisée.
+async function sms(phone: string, content: string) {
+  if (!BREVO_API_KEY || !phone) return;
+  try {
+    const res = await fetch('https://api.brevo.com/v3/transactionalSMS/send', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ sender: SMS_SENDER, recipient: intl(phone), content, type: 'transactional' }),
+    });
+    if (!res.ok) console.error('Brevo', res.status, await res.text());
+  } catch (e) { console.error('Brevo', e); }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST' || !SECRET || req.headers.get('x-webhook-secret') !== SECRET) {
     return new Response('forbidden', { status: 403 });
@@ -66,22 +86,31 @@ Deno.serve(async (req) => {
         `Une demande est en attente de confirmation. <a href="${SITE}/admin/">Ouvrir l'administration</a>.`,
         [...recap, ['Client', b.full_name], ['Téléphone', b.phone], ['E-mail', b.email ?? '—']],
       ), b.email ?? undefined);
+      // SMS : équipe (nouvelle demande) + client (accusé de réception)
+      await Promise.all([
+        ...SMS_TEAM.map((n) => sms(n, `Barber Truck : nouvelle demande ${when(b)} - ${b.full_name} ${b.phone}. Voir ${SITE}/admin/`)),
+        sms(b.phone, `Barber Truck 93 : demande reçue pour ${when(b)}. Elle sera réservée après notre confirmation, vous recevrez un SMS.`),
+      ]);
       // Client : accusé de réception
       if (b.email) await send([b.email], 'Votre demande de rendez-vous – Barber Truck 93', layout(
         'Demande bien reçue',
         `Bonjour ${esc(b.full_name)}, nous avons bien reçu votre demande. Elle sera définitivement réservée <strong>après notre confirmation</strong> : vous recevrez un e-mail dès que c'est fait.`,
         recap,
       ));
-    } else if (payload.op === 'UPDATE' && b.status === 'confirmed' && b.email) {
-      await send([b.email], 'Rendez-vous confirmé – Barber Truck 93', layout(
+    } else if (payload.op === 'UPDATE' && b.status === 'confirmed') {
+      await sms(b.phone, `Barber Truck 93 : RDV confirmé ${when(b)}. Un empêchement ? Appelez le 07 58 04 13 74.`);
+      if (b.email) await send([b.email], 'Rendez-vous confirmé – Barber Truck 93', layout(
         'Rendez-vous confirmé',
         `Bonjour ${esc(b.full_name)}, votre rendez-vous est confirmé. Le Barber Truck viendra à l'adresse indiquée.`,
         recap,
         'Un empêchement ? Appelez-nous au 07 58 04 13 74.',
       ));
-    } else if (payload.op === 'UPDATE' && (b.status === 'cancelled' || b.status === 'declined') && b.email) {
+    } else if (payload.op === 'UPDATE' && (b.status === 'cancelled' || b.status === 'declined')) {
       const declined = b.status === 'declined';
-      await send([b.email], declined ? 'Demande de rendez-vous non retenue – Barber Truck 93' : 'Rendez-vous annulé – Barber Truck 93', layout(
+      await sms(b.phone, declined
+        ? `Barber Truck 93 : nous ne pouvons pas honorer le créneau du ${when(b)}. Autre créneau sur ${SITE.replace('https://', '')} ou 07 58 04 13 74.`
+        : `Barber Truck 93 : votre RDV du ${when(b)} est annulé. Nouveau créneau sur ${SITE.replace('https://', '')} ou 07 58 04 13 74.`);
+      if (b.email) await send([b.email], declined ? 'Demande de rendez-vous non retenue – Barber Truck 93' : 'Rendez-vous annulé – Barber Truck 93', layout(
         declined ? 'Demande non retenue' : 'Rendez-vous annulé',
         declined
           ? `Bonjour ${esc(b.full_name)}, nous ne pouvons malheureusement pas honorer ce créneau.`
