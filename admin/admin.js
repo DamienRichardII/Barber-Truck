@@ -118,14 +118,25 @@
     return n;
   }
 
-  /* Plusieurs demandes peuvent viser le même horaire : seul un créneau confirmé est bloqué. */
-  const sameSlot = (b) => rows.filter((r) => r.id !== b.id && r.slot_date === b.slot_date && r.slot_time === b.slot_time);
+  /* Un rendez-vous dure 30 min de déplacement + 30 min par personne (champ duration_min). Les créneaux sont à la demi-heure ;
+     00h00-02h30 appartiennent à la soirée du jour indiqué (+24 h). */
+  const slotMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
+  const hmin = (m) => { const x = m % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}h${String(x % 60).padStart(2, '0')}`; };
+  const durMin = (b) => b.duration_min || 60;
+  const endTime = (b) => hmin(slotMin(b.slot_time) + durMin(b));
+  const fmtDur = (m) => `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}` : ''}`;
+  const timeRange = (b) => `${b.slot_time} → ${endTime(b)}`;
+  const overlaps = (a, b) => a.slot_date === b.slot_date
+    && slotMin(a.slot_time) < slotMin(b.slot_time) + durMin(b) && slotMin(b.slot_time) < slotMin(a.slot_time) + durMin(a);
+
+  /* Plusieurs demandes peuvent viser la même plage : seule une plage confirmée est bloquée. */
+  const sameSlot = (b) => rows.filter((r) => r.id !== b.id && overlaps(r, b));
   const slotTaken = (b) => b.status === 'pending' && sameSlot(b).some((r) => r.status === 'confirmed');
   function slotNote(b) {
     if (b.status !== 'pending') return '';
-    if (slotTaken(b)) { const c = sameSlot(b).find((r) => r.status === 'confirmed'); return `Créneau déjà confirmé pour ${c.full_name}. Vous pouvez le remplacer : l'autre client sera annulé.`; }
+    if (slotTaken(b)) { const c = sameSlot(b).find((r) => r.status === 'confirmed'); return `Plage déjà prise par un rendez-vous confirmé (${c.full_name}, ${timeRange(c)}). Vous pouvez le remplacer : l'autre client sera annulé.`; }
     const n = sameSlot(b).filter((r) => r.status === 'pending').length;
-    return n ? `${n} autre${n > 1 ? 's' : ''} demande${n > 1 ? 's' : ''} pour ce créneau : confirmez celle de votre choix.` : '';
+    return n ? `${n} autre${n > 1 ? 's' : ''} demande${n > 1 ? 's' : ''} sur cette plage horaire : confirmez celle de votre choix.` : '';
   }
 
   function card(b, readOnly) {
@@ -136,7 +147,7 @@
       el('dt', { text: 'Téléphone' }), el('dd', {}, [phone]),
       ...(b.email ? [el('dt', { text: 'E-mail' }), el('dd', {}, [el('a', { href: `mailto:${b.email}`, text: b.email })])] : []),
       el('dt', { text: 'Adresse' }), el('dd', {}, [addr]),
-      el('dt', { text: 'Prestation' }), el('dd', { text: `${SERVICES[b.service] || b.service} · ${b.party_size} ${b.party_size > 1 ? 'personnes' : 'personne'}` }),
+      el('dt', { text: 'Prestation' }), el('dd', { text: `${SERVICES[b.service] || b.service} · ${b.party_size} ${b.party_size > 1 ? 'personnes' : 'personne'} · ${fmtDur(durMin(b))}` }),
     ]);
     const btns = el('div', { class: 'card__actions' });
     const act = (label, cls, status) => {
@@ -149,7 +160,7 @@
     const created = new Date(b.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     return el('li', { class: 'card' }, [
       el('div', { class: 'card__top' }, [
-        el('span', { class: 'card__when', text: `${fmtDate(b.slot_date)} · ${b.slot_time}` }),
+        el('span', { class: 'card__when', text: `${fmtDate(b.slot_date)} · ${timeRange(b)}` }),
         el('span', { class: `badge badge--${b.status}`, text: STATUS[b.status] || b.status }),
       ]),
       dl, ...(readOnly ? [] : [...(slotNote(b) ? [el('p', { class: `card__note${slotTaken(b) ? ' is-ko' : ''}`, text: slotNote(b) })] : []), btns, el('p', { class: 'card__meta', text: `Demande reçue le ${created}` })]),
@@ -171,14 +182,13 @@
   }
 
   /* ---- planning : toutes les réservations avec toutes leurs informations ---- */
-  const SLOT_ORDER = ['18h00', '19h00', '20h00', '21h00', '22h00', '23h00', '00h00', '01h00', '02h00'];
   const planBody = $('#plan-body');
   const planMsg = $('#plan-msg');
   const planPeriod = $('#plan-period');
   const planStatus = $('#plan-status');
   const planSearch = $('#plan-search');
   const todayParis = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
-  const slotRank = (t) => { const i = SLOT_ORDER.indexOf(t); return i < 0 ? 99 : i; };
+  const slotRank = (t) => slotMin(t);
   const fmtShort = (iso) => new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const peopleLabel = (n) => `${n} ${n > 1 ? 'personnes' : 'personne'}`;
 
@@ -234,7 +244,7 @@
     if (slotNote(b)) acts.append(el('p', { class: `card__note${slotTaken(b) ? ' is-ko' : ''}`, text: slotNote(b) }));
     const tr = el('tr', { class: `row is-${b.status}` });
     tr.append(
-      td('Heure', document.createTextNode(b.slot_time), 'plan__time'),
+      td('Heure', document.createTextNode(`${timeRange(b)} (${fmtDur(durMin(b))})`), 'plan__time'),
       td('Client', document.createTextNode(b.full_name)),
       td('Téléphone', phone),
       td('Adresse', addr),
@@ -268,9 +278,9 @@
 
   function exportCsv() {
     const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const head = ['Date', 'Heure', 'Nom', 'Téléphone', 'Adresse', 'Prestation', 'Personnes', 'Statut', 'Reçue le', 'Décidée le'];
+    const head = ['Date', 'Heure', 'Fin', 'Durée (min)', 'Nom', 'Téléphone', 'Adresse', 'Prestation', 'Personnes', 'Statut', 'Reçue le', 'Décidée le'];
     const lines = planFiltered().map((b) => [
-      b.slot_date, b.slot_time, b.full_name, fmtPhone(b.phone), b.address, SERVICES[b.service] || b.service, b.party_size,
+      b.slot_date, b.slot_time, endTime(b), durMin(b), b.full_name, fmtPhone(b.phone), b.address, SERVICES[b.service] || b.service, b.party_size,
       STATUS[b.status] || b.status, b.created_at ? fmtShort(b.created_at) : '', b.decided_at ? fmtShort(b.decided_at) : '',
     ].map(q).join(';'));
     const blob = new Blob(['﻿' + [head.map(q).join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });

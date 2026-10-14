@@ -1,4 +1,5 @@
--- Notifications e-mail (Resend) : demande, confirmation, annulation / refus.
+-- Notifications de réservation : appelle la fonction `notify-booking` (SMS Brevo) à chaque demande et changement de statut.
+-- ATTENTION : la définition de create_booking ci-dessous est remplacée par supabase/durations.sql (à exécuter ensuite).
 -- À exécuter UNE fois dans le SQL Editor de Supabase, APRES avoir déployé la fonction `notify-booking`
 -- (voir supabase/functions/notify-booking/README.md).
 --

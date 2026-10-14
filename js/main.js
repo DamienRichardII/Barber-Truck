@@ -6,7 +6,19 @@
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- Données de démonstration ---------- */
-  const SLOTS = ['18h00', '19h00', '20h00', '21h00', '22h00', '23h00', '00h00', '01h00', '02h00'];
+  /* Planning à la demi-heure. Durée d'un rendez-vous = 30 min de déplacement + 30 min par personne
+     (1 personne : 1 h, 2 personnes : 1 h 30, groupe de 3 : 2 h…). Tout doit se terminer avant 03h00. */
+  const OPEN = 18 * 60;          // premier départ possible : 18h00
+  const CLOSE = 27 * 60;         // fin de soirée : 03h00 (lendemain)
+  const TRAVEL = 30;
+  const PER_PERSON = 30;
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const fmtMin = (m) => `${pad2(Math.floor((m % 1440) / 60))}h${pad2(m % 60)}`;
+  const toMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
+  const durationFor = (n) => TRAVEL + PER_PERSON * n;
+  const fmtDuration = (min) => { const h = Math.floor(min / 60); const m = min % 60; return h ? (m ? `${h} h ${pad2(m)}` : `${h} h`) : `${m} min`; };
+  const SLOTS = [];
+  for (let m = OPEN; m <= CLOSE - 60; m += 30) SLOTS.push(fmtMin(m));   // 18h00 … 02h00
   const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
   const WEEKDAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
@@ -103,11 +115,13 @@
     const titleEl = $('#cal-title', root);
     const slotsEl = $('#slots-grid', root);
     const slotsDateEl = $('#slots-date', root);
+    const rangeEl = $('#slots-range', root);
     const prevBtn = $('[data-cal="prev"]', root);
     const nextBtn = $('[data-cal="next"]', root);
     const form = $('#booking-form', root);
     const fieldsEl = $('#booking-fields', root);
-    const partyField = $('#field-party', root);
+    const partyInput = $('#f-party', root);
+    const durationEl = $('#party-duration', root);
     const confirmBtn = $('#booking-confirm', root);
     const statusEl = $('#booking-status', root);
     const doneEl = $('#booking-done', root);
@@ -122,7 +136,7 @@
       slot: null,
       service: '',
       serviceLabel: '',
-      taken: new Map(), // "YYYY-MM-DD|18h00" -> "pending" | "confirmed"
+      busy: new Map(), // "YYYY-MM-DD" -> [[début, fin], …] en minutes (rendez-vous confirmés)
       sending: false,
     };
 
@@ -130,7 +144,6 @@
     const sameDay = (a, b) => a && b && iso(a) === iso(b);
     const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const longDate = (d) => `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    const takenStatus = (d, time) => state.taken.get(`${iso(d)}|${time}`);
 
     /* heure de Paris (le créneau 00h00-02h00 d'une soirée tombe le lendemain) */
     const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -139,13 +152,32 @@
       return { date: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
     }
     function isPast(d, time) {
-      const hour = parseInt(time, 10);
+      const h = parseInt(time, 10);
       const [y, mo, da] = iso(d).split('-').map(Number);
-      const slotDate = new Date(Date.UTC(y, mo - 1, da + (hour < 6 ? 1 : 0))).toISOString().slice(0, 10);
+      const slotDate = new Date(Date.UTC(y, mo - 1, da + (h < 6 ? 1 : 0))).toISOString().slice(0, 10);
       const now = parisNow();
-      return slotDate < now.date || (slotDate === now.date && hour * 60 <= now.minutes);
+      return slotDate < now.date || (slotDate === now.date && h * 60 + parseInt(time.slice(3), 10) <= now.minutes);
     }
     const fmtPhone = (p) => (/^0\d{9}$/.test(p) ? p.replace(/(\d{2})(?=\d)/g, '$1 ') : p);
+
+    /* nombre de personnes (toujours dans la plage autorisée pour la prestation) → durée */
+    const partyCount = () => {
+      const n = Number(partyInput.value);
+      const lo = Number(partyInput.min);
+      const hi = Number(partyInput.max);
+      return Number.isInteger(n) && n >= lo && n <= hi ? n : lo;
+    };
+    const currentDuration = () => durationFor(partyCount());
+
+    /* 'late' = finirait après 03h00 · 'past' = déjà passé · 'busy' = chevauche un rendez-vous confirmé · null = libre */
+    function slotStatus(d, time) {
+      const start = toMin(time);
+      const end = start + currentDuration();
+      if (end > CLOSE) return 'late';
+      if (isPast(d, time)) return 'past';
+      const list = state.busy.get(iso(d)) || [];
+      return list.some(([s, e]) => s < end && start < e) ? 'busy' : null;
+    }
 
     function setStatus(msg, isError = false) {
       statusEl.textContent = msg;
@@ -159,32 +191,48 @@
       });
     }
 
+    function updateDuration() {
+      const n = partyCount();
+      durationEl.textContent = `Durée du rendez-vous : ${fmtDuration(durationFor(n))} (30 min de déplacement + 30 min par personne).`;
+    }
+
     function readService() {
       const input = $('input[name="service"]:checked', root);
       state.service = input ? input.value : '';
       state.serviceLabel = input ? input.dataset.label : '';
       const group = state.service === 'offre-groupe';
-      const pf = $('#f-party', root);
       const pl = $('#l-party', root);
-      pf.min = group ? '3' : '1';
-      pf.max = group ? '20' : '2';
-      pl.textContent = group ? 'Nombre de personnes à couper (minimum 3)' : 'Nombre de personnes à couper (1 ou 2)';
-      const cur = Number(pf.value);
-      if (!Number.isInteger(cur) || cur < Number(pf.min) || cur > Number(pf.max)) pf.value = pf.min;
+      partyInput.min = group ? '3' : '1';
+      partyInput.max = group ? '17' : '2';
+      pl.textContent = group ? 'Nombre de personnes (minimum 3)' : 'Nombre de personnes (1 ou 2)';
+      const cur = Number(partyInput.value);
+      if (!Number.isInteger(cur) || cur < Number(partyInput.min) || cur > Number(partyInput.max)) partyInput.value = partyInput.min;
     }
 
-    /* créneaux déjà pris, pour le mois affiché */
-    async function loadTaken() {
+    /* après un changement de prestation / de nombre de personnes : la durée change, donc les créneaux libres aussi */
+    function refresh() {
+      updateDuration();
+      if (state.slot && slotStatus(state.date, state.slot)) state.slot = null;
+      renderSlots();
+      updateForm();
+    }
+
+    /* créneaux déjà pris (début + durée), pour le mois affiché */
+    async function loadBusy() {
       if (!api || !api.isConfigured) return;
       const from = new Date(state.view.getFullYear(), state.view.getMonth(), 1);
       const to = new Date(state.view.getFullYear(), state.view.getMonth() + 1, 0);
       try {
-        const rows = await api.getTakenSlots(iso(from), iso(to));
+        const rows = await api.getBusySlots(iso(from), iso(to));
         const monthKey = iso(from).slice(0, 7);
-        [...state.taken.keys()].filter((k) => k.startsWith(monthKey)).forEach((k) => state.taken.delete(k));
-        rows.forEach((r) => state.taken.set(`${r.slot_date}|${r.slot_time}`, r.status));
-        if (state.slot && takenStatus(state.date, state.slot)) { state.slot = null; updateForm(); }
-        renderSlots();
+        [...state.busy.keys()].filter((k) => k.startsWith(monthKey)).forEach((k) => state.busy.delete(k));
+        rows.forEach((r) => {
+          const start = toMin(r.slot_time);
+          const list = state.busy.get(r.slot_date) || [];
+          list.push([start, start + (r.duration_min || 60)]);
+          state.busy.set(r.slot_date, list);
+        });
+        refresh();
       } catch { /* on garde l'affichage actuel : l'envoi vérifiera de toute façon */ }
     }
 
@@ -220,41 +268,31 @@
       daysEl.replaceChildren(frag);
     }
 
+    const LABELS = { busy: 'indisponible', past: 'horaire passé', late: 'trop tard pour cette durée' };
     function renderSlots() {
       slotsDateEl.textContent = longDate(state.date);
       const frag = document.createDocumentFragment();
       SLOTS.forEach((time) => {
-        const status = takenStatus(state.date, time);
+        const status = slotStatus(state.date, time);
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'slot';
         b.dataset.time = time;
-        if (!status && isPast(state.date, time)) {
+        b.textContent = time;
+        if (status) {
           b.disabled = true;
           b.classList.add('slot--booked');
-          b.textContent = time;
-          b.setAttribute('aria-label', `${time} – horaire passé`);
-        } else if (status) {
-          b.disabled = true;
-          b.classList.add(status === 'pending' ? 'slot--pending' : 'slot--booked');
-          const label = document.createElement('span');
-          label.className = 'slot__time';
-          label.textContent = time;
-          b.append(label);
-          if (status === 'pending') {
-            const small = document.createElement('small');
-            small.textContent = 'En attente';
-            b.append(small);
-          }
-          b.setAttribute('aria-label', `${time} – ${status === 'pending' ? 'en attente de confirmation' : 'indisponible'}`);
+          b.setAttribute('aria-label', `${time} – ${LABELS[status]}`);
         } else {
-          b.textContent = time;
           b.setAttribute('aria-pressed', String(state.slot === time));
           if (state.slot === time) b.classList.add('is-selected');
         }
         frag.append(b);
       });
       slotsEl.replaceChildren(frag);
+      rangeEl.textContent = state.slot
+        ? `Votre rendez-vous : de ${state.slot} à ${fmtMin(toMin(state.slot) + currentDuration())} (déplacement inclus).`
+        : '';
     }
 
     /* champs de contact visibles dès qu'un créneau est choisi */
@@ -265,26 +303,23 @@
     }
 
     function clearInvalid() {
-      $$('[aria-invalid]', form).forEach((el) => el.removeAttribute('aria-invalid'));
+      $$('[aria-invalid]', root).forEach((el) => el.removeAttribute('aria-invalid'));
     }
 
     function validate() {
       clearInvalid();
       const f = form.elements;
       const phone = f.phone.value.replace(/[^\d+]/g, '');
+      const group = state.service === 'offre-groupe';
+      const lo = Number(partyInput.min);
+      const hi = Number(partyInput.max);
+      const n = Number(partyInput.value);
       const checks = [
         [f.name, f.name.value.trim().length >= 2, 'Merci d\'indiquer votre nom et prénom.'],
         [f.phone, /^\+?\d{9,15}$/.test(phone), 'Merci d\'indiquer un numéro de téléphone valide.'],
-        [f.email, /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.value.trim()), 'Merci d\'indiquer une adresse e-mail valide.'],
         [f.address, f.address.value.trim().length >= 8, 'Merci d\'indiquer votre adresse complète.'],
+        [partyInput, Number.isInteger(n) && n >= lo && n <= hi, group ? `L'offre groupe demande entre ${lo} et ${hi} personnes.` : 'Indiquez 1 ou 2 personnes (à partir de 3, choisissez l\'offre groupe).'],
       ];
-      {
-        const group = state.service === 'offre-groupe';
-        const lo = group ? 3 : 1;
-        const hi = group ? 20 : 2;
-        const n = Number(f.party.value);
-        checks.push([f.party, Number.isInteger(n) && n >= lo && n <= hi, group ? 'L\'offre groupe demande entre 3 et 20 personnes.' : 'Indiquez 1 ou 2 personnes (à partir de 3, choisissez l\'offre groupe).']);
-      }
       const bad = checks.find(([, ok]) => !ok);
       if (bad) {
         bad[0].setAttribute('aria-invalid', 'true');
@@ -295,9 +330,8 @@
       return {
         name: f.name.value.trim(),
         phone,
-        email: f.email.value.trim().toLowerCase(),
         address: f.address.value.trim(),
-        partySize: Number(f.party.value),
+        partySize: n,
       };
     }
 
@@ -309,23 +343,36 @@
       setStatus('');
       setStep(1);
       readService();
-      renderSlots();
-      updateForm();
+      partyInput.value = partyInput.min;
+      refresh();
     }
 
     /* prestation */
     root.addEventListener('change', (e) => {
       if (e.target.name !== 'service') return;
       readService();
+      partyInput.value = partyInput.min;
       setStatus('');
       setStep(2);
+      refresh();
+    });
+
+    /* nombre de personnes : champ + boutons − / + */
+    partyInput.addEventListener('input', () => { setStatus(''); refresh(); });
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-party]');
+      if (!btn) return;
+      const next = partyCount() + Number(btn.dataset.party);
+      partyInput.value = Math.min(Number(partyInput.max), Math.max(Number(partyInput.min), next));
+      setStatus('');
+      refresh();
     });
 
     /* mois précédent / suivant */
     const changeMonth = (delta) => {
       state.view = new Date(state.view.getFullYear(), state.view.getMonth() + delta, 1);
       renderCalendar();
-      loadTaken();
+      loadBusy();
     };
     prevBtn.addEventListener('click', () => changeMonth(-1));
     nextBtn.addEventListener('click', () => changeMonth(1));
@@ -363,21 +410,20 @@
         return;
       }
       if (form.elements.website.value) return; // anti-spam (champ piège)
-      if (isPast(state.date, state.slot)) {
-        state.slot = null;
-        updateForm();
-        renderSlots();
-        setStatus('Cet horaire est déjà passé. Merci d\'en choisir un autre.', true);
-        return;
-      }
       const contact = validate();
       if (!contact) return;
+      if (slotStatus(state.date, state.slot)) {
+        state.slot = null;
+        refresh();
+        setStatus('Cet horaire n\'est plus disponible. Merci d\'en choisir un autre.', true);
+        return;
+      }
 
       state.sending = true;
       confirmBtn.classList.add('is-loading');
       confirmBtn.setAttribute('aria-disabled', 'true');
       setStatus('Envoi de votre demande…');
-      const sent = { date: new Date(state.date), time: state.slot };
+      const sent = { date: new Date(state.date), time: state.slot, end: fmtMin(toMin(state.slot) + durationFor(contact.partySize)) };
       try {
         await api.createBooking({
           service: state.service,
@@ -386,13 +432,13 @@
           time: sent.time,
           name: contact.name,
           phone: contact.phone,
-          email: contact.email,
+          email: '',
           address: contact.address,
         });
         form.hidden = true;
-        doneText.textContent = `${state.serviceLabel} · ${cap(longDate(sent.date))} à ${sent.time}. `
-          + `Votre créneau est en attente de confirmation de notre part. Dès qu'il est confirmé, vous recevrez un SMS au ${fmtPhone(contact.phone)} et un e-mail à ${contact.email}. `
-          + `Une question ? Appelez-nous au 07 58 04 13 74.`;
+        doneText.textContent = `${state.serviceLabel} · ${cap(longDate(sent.date))} de ${sent.time} à ${sent.end}. `
+          + `Votre créneau est en attente de confirmation de notre part. Dès qu'il est confirmé, vous recevrez un SMS au ${fmtPhone(contact.phone)}. `
+          + `Une question ? Appelez-nous au 07 58 04 13 74 ou écrivez-nous sur WhatsApp.`;
         doneEl.hidden = false;
         setStep(3);
         steps.forEach((li) => li.classList.add('is-done'));
@@ -400,8 +446,8 @@
         doneEl.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'nearest' });
       } catch (err) {
         setStatus(api.message(err.code), true);
-        if (err.code === 'slot_taken') { state.slot = null; updateForm(); }
-        loadTaken();
+        if (err.code === 'slot_taken' || err.code === 'slot_passed' || err.code === 'invalid_slot') { state.slot = null; updateForm(); }
+        loadBusy();
       } finally {
         state.sending = false;
         confirmBtn.classList.remove('is-loading');
@@ -417,6 +463,8 @@
         if (!input) return;
         input.checked = true;
         readService();
+        partyInput.value = partyInput.min;
+        refresh();
         setStep(2);
       });
     });
@@ -424,16 +472,16 @@
     /* mise à jour quand l'onglet redevient visible */
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
-      if (state.slot && isPast(state.date, state.slot)) { state.slot = null; updateForm(); }
-      loadTaken();
-      renderSlots();
+      loadBusy();
+      refresh();
     });
 
     readService();
+    updateDuration();
     renderCalendar();
     renderSlots();
     updateForm();
-    loadTaken();
+    loadBusy();
   }
 
   initHeader();

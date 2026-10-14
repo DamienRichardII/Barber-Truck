@@ -48,8 +48,8 @@ window.BarberAPI = (() => {
     return res.json();
   }
 
-  /** Créneaux pris (en attente ou confirmés) entre deux dates ISO (YYYY-MM-DD). */
-  const getTakenSlots = (from, to) => rpc('get_taken_slots', { p_from: from, p_to: to });
+  /** Rendez-vous confirmés (début + durée en minutes) entre deux dates ISO (YYYY-MM-DD). */
+  const getBusySlots = (from, to) => rpc('get_busy_slots', { p_from: from, p_to: to });
 
   const createBooking = (b) => rpc('create_booking', {
     p_service: b.service,
@@ -58,7 +58,7 @@ window.BarberAPI = (() => {
     p_time: b.time,
     p_name: b.name,
     p_phone: b.phone,
-    p_email: b.email,
+    p_email: b.email || '',
     p_address: b.address,
   });
 
@@ -67,5 +67,5 @@ window.BarberAPI = (() => {
 
   const message = (code) => ERRORS[code] || ERRORS.unknown;
 
-  return { isConfigured, getTakenSlots, createBooking, getTruckPositions, message };
+  return { isConfigured, getBusySlots, createBooking, getTruckPositions, message };
 })();
