@@ -13,6 +13,7 @@
   let trucks = [];
   let lateFlag = false;
   let positions = [];
+  let blocks = [];   // plages bloquées à la main (chefs de projet)
   const LATE_MS = 60 * 60 * 1000;
 
   const auth = $('#auth');
@@ -35,7 +36,7 @@
   }
 
   function logout(message) {
-    session = null; saveSession(null); rows = [];
+    session = null; saveSession(null); rows = []; blocks = [];
     clearInterval(timer);
     show(false);
     const msg = $('#login-msg');
@@ -99,7 +100,7 @@
       body: JSON.stringify({ status }),
     });
     if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
-    if (res.status === 409) { listMsg.textContent = 'Ce créneau est déjà confirmé pour un autre client.'; listMsg.classList.add('is-error'); button.disabled = false; return; }
+    if (res.status === 409) { listMsg.textContent = 'Ce créneau est déjà pris (rendez-vous confirmé ou plage bloquée).'; listMsg.classList.add('is-error'); button.disabled = false; return; }
     if (!res.ok) { listMsg.textContent = 'La modification a échoué.'; listMsg.classList.add('is-error'); button.disabled = false; return; }
     await fetchRows();
   }
@@ -131,9 +132,12 @@
 
   /* Plusieurs demandes peuvent viser la même plage : seule une plage confirmée est bloquée. */
   const sameSlot = (b) => rows.filter((r) => r.id !== b.id && overlaps(r, b));
+  const blockOf = (b) => blocks.find((k) => overlaps(k, b));
   const slotTaken = (b) => b.status === 'pending' && sameSlot(b).some((r) => r.status === 'confirmed');
   function slotNote(b) {
     if (b.status !== 'pending') return '';
+    const k = blockOf(b);
+    if (k) return `Plage bloquée à la main (${timeRange(k)}${k.note ? ` · ${k.note}` : ''}). Débloquez-la dans « Créneaux » pour pouvoir confirmer cette demande.`;
     if (slotTaken(b)) { const c = sameSlot(b).find((r) => r.status === 'confirmed'); return `Plage déjà prise par un rendez-vous confirmé (${c.full_name}, ${timeRange(c)}). Vous pouvez le remplacer : l'autre client sera annulé.`; }
     const n = sameSlot(b).filter((r) => r.status === 'pending').length;
     return n ? `${n} autre${n > 1 ? 's' : ''} demande${n > 1 ? 's' : ''} sur cette plage horaire : confirmez celle de votre choix.` : '';
@@ -155,7 +159,7 @@
       bt.addEventListener('click', () => setStatus(b.id, status, bt));
       btns.append(bt);
     };
-    if (!readOnly && b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, btns); act('Refuser', 'btn--ko', 'declined'); }
+    if (!readOnly && b.status === 'pending') { if (blockOf(b)) { /* confirmation impossible tant que la plage est bloquée */ } else if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, btns); act('Refuser', 'btn--ko', 'declined'); }
     if (!readOnly && b.status === 'confirmed') act('Annuler le rendez-vous', 'btn--ko', 'cancelled');
     const created = new Date(b.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     return el('li', { class: 'card' }, [
@@ -163,7 +167,7 @@
         el('span', { class: 'card__when', text: `${fmtDate(b.slot_date)} · ${timeRange(b)}` }),
         el('span', { class: `badge badge--${b.status}`, text: STATUS[b.status] || b.status }),
       ]),
-      dl, ...(readOnly ? [] : [...(slotNote(b) ? [el('p', { class: `card__note${slotTaken(b) ? ' is-ko' : ''}`, text: slotNote(b) })] : []), btns, el('p', { class: 'card__meta', text: `Demande reçue le ${created}` })]),
+      dl, ...(readOnly ? [] : [...(slotNote(b) ? [el('p', { class: `card__note${slotTaken(b) || blockOf(b) ? ' is-ko' : ''}`, text: slotNote(b) })] : []), btns, el('p', { class: 'card__meta', text: `Demande reçue le ${created}` })]),
     ]);
   }
 
@@ -239,9 +243,9 @@
       bt.addEventListener('click', () => setStatus(b.id, status, bt));
       acts.append(bt);
     };
-    if (b.status === 'pending') { if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, acts); act('Refuser', 'btn--ko', 'declined'); }
+    if (b.status === 'pending') { if (blockOf(b)) { /* confirmation impossible tant que la plage est bloquée */ } else if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, acts); act('Refuser', 'btn--ko', 'declined'); }
     if (b.status === 'confirmed') act('Annuler', 'btn--ko', 'cancelled');
-    if (slotNote(b)) acts.append(el('p', { class: `card__note${slotTaken(b) ? ' is-ko' : ''}`, text: slotNote(b) }));
+    if (slotNote(b)) acts.append(el('p', { class: `card__note${slotTaken(b) || blockOf(b) ? ' is-ko' : ''}`, text: slotNote(b) }));
     const tr = el('tr', { class: `row is-${b.status}` });
     tr.append(
       td('Heure', document.createTextNode(`${timeRange(b)} (${fmtDur(durMin(b))})`), 'plan__time'),
@@ -342,7 +346,8 @@
   /* ---- navigation entre les sections ---- */
   function showView(name) {
     if (!isAdmin() && !['trucks', 'barber'].includes(name)) name = 'barber';
-    ['requests', 'planning', 'trucks', 'barber', 'barbers'].forEach((v) => { $(`#view-${v}`).hidden = v !== name; });
+    ['requests', 'planning', 'blocks', 'trucks', 'barber', 'barbers'].forEach((v) => { $(`#view-${v}`).hidden = v !== name; });
+    if (name === 'blocks') renderBlocks();
     if (name === 'barber') renderBarber();
     if (name === 'barbers') loadBarbers();
     document.querySelectorAll('#views button').forEach((b) => b.classList.toggle('is-active', b.dataset.view === name));
@@ -351,6 +356,140 @@
     const b = e.target.closest('button[data-view]');
     if (b) showView(b.dataset.view);
   });
+
+  /* ---- créneaux : bloquer / débloquer à la main (chefs de projet) ---- */
+  const CLOSE_MIN = 29 * 60 + 30;                       // tout se termine avant 05h30
+  const START_TIMES = [];
+  for (let m = 18 * 60; m <= CLOSE_MIN - 60; m += 30) START_TIMES.push(hmin(m));   // 18h00 … 04h30
+  const blkForm = $('#block-form');
+  const blkDate = $('#blk-date');
+  const blkSize = $('#blk-size');
+  const blkTime = $('#blk-time');
+  const blkNote = $('#blk-note');
+  const blkRange = $('#blk-range');
+  const blkMsg = $('#blocks-msg');
+  const blkGrid = $('#blk-grid');
+  const blkList = $('#blocks-list');
+  const blkListMsg = $('#blocks-list-msg');
+  const sizeLabel = (n) => `${n === 1 ? '1 personne' : n === 2 ? 'Duo' : n === 3 ? 'Trio' : `Groupe de ${n}`} · ${fmtDur(30 + 30 * n)}`;
+  const sizeMin = () => 30 + 30 * Number(blkSize.value || 1);
+  const dayOk = () => /^\d{4}-\d{2}-\d{2}$/.test(blkDate.value);
+  const say = (text, bad = false) => { blkMsg.textContent = text; blkMsg.classList.toggle('is-error', bad); };
+
+  function initBlockForm() {
+    blkSize.replaceChildren(...Array.from({ length: 17 }, (_, i) => el('option', { value: String(i + 1), text: sizeLabel(i + 1) })));
+    blkDate.min = todayParis();
+    blkDate.value = todayParis();
+    fillTimes();
+  }
+  /* les heures de début qui ne tiennent pas avant 05h30 pour la taille choisie sont désactivées */
+  function fillTimes() {
+    const keep = blkTime.value;
+    const dur = sizeMin();
+    blkTime.replaceChildren(...START_TIMES.map((t) => {
+      const o = el('option', { value: t, text: t });
+      if (slotMin(t) + dur > CLOSE_MIN) o.disabled = true;
+      return o;
+    }));
+    const firstOk = START_TIMES.find((t) => slotMin(t) + dur <= CLOSE_MIN);
+    blkTime.value = keep && slotMin(keep) + dur <= CLOSE_MIN ? keep : (firstOk || '');
+    updateBlockRange();
+  }
+  function updateBlockRange() {
+    blkRange.textContent = blkTime.value
+      ? `Plage à bloquer : de ${blkTime.value} à ${hmin(slotMin(blkTime.value) + sizeMin())} (${fmtDur(sizeMin())}, déplacement inclus).`
+      : '';
+  }
+
+  async function fetchBlocks() {
+    if (!isAdmin()) return;
+    try {
+      const res = await fetch(`${cfg.supabaseUrl}/rest/v1/slot_blocks?select=*&slot_date=gte.${todayParis()}&order=slot_date.asc,slot_time.asc`, { headers: headers() });
+      if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
+      if (!res.ok) throw new Error();
+      blocks = await res.json();
+      blkListMsg.classList.remove('is-error');
+    } catch { blkListMsg.textContent = 'Impossible de charger les plages bloquées.'; blkListMsg.classList.add('is-error'); return; }
+    render();
+    renderBlocks();
+  }
+
+  async function removeBlock(k) {
+    if (!window.confirm(`Débloquer cette plage ?\n${fmtDate(k.slot_date)} · ${timeRange(k)}${k.note ? `\n(${k.note})` : ''}\nElle redeviendra disponible sur le site.`)) return;
+    say('Déblocage…');
+    try {
+      const res = await fetch(`${cfg.supabaseUrl}/rest/v1/slot_blocks?id=eq.${encodeURIComponent(k.id)}`, { method: 'DELETE', headers: { ...headers(), Prefer: 'return=minimal' } });
+      if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
+      if (!res.ok) throw new Error();
+      say('Plage débloquée : elle est de nouveau disponible sur le site.');
+      await fetchBlocks();
+    } catch { say('Le déblocage a échoué. Réessayez.', true); }
+  }
+
+  function renderBlocks() {
+    if (!isAdmin()) return;
+    /* aperçu du jour choisi : un bouton par demi-heure */
+    const day = dayOk() ? blkDate.value : todayParis();
+    blkGrid.replaceChildren(...START_TIMES.concat(['05h00']).map((t) => {
+      const m = slotMin(t);
+      const k = blocks.find((x) => x.slot_date === day && slotMin(x.slot_time) < m + 30 && m < slotMin(x.slot_time) + x.duration_min);
+      const r = rows.find((x) => x.status === 'confirmed' && x.slot_date === day && slotMin(x.slot_time) < m + 30 && m < slotMin(x.slot_time) + durMin(x));
+      const state = r ? 'booked' : k ? 'blocked' : 'free';
+      const b = el('button', { type: 'button', class: `blocks__cell is-${state}`, text: t, title: r ? `${r.full_name} · ${timeRange(r)}` : k ? `${timeRange(k)}${k.note ? ` · ${k.note}` : ''}` : 'Libre' });
+      if (state === 'booked') b.disabled = true;
+      b.addEventListener('click', () => {
+        if (state === 'blocked') return removeBlock(k);
+        if (!blkTime.querySelector(`option[value="${t}"]`) || blkTime.querySelector(`option[value="${t}"]`).disabled) { say(`${t} ne tient pas avant 05h30 pour cette taille : choisissez une taille plus petite.`, true); return; }
+        blkTime.value = t; updateBlockRange(); say(''); blkTime.focus();
+      });
+      return b;
+    }));
+    /* liste de toutes les plages bloquées à venir */
+    blkListMsg.textContent = blocks.length ? '' : 'Aucune plage bloquée à venir.';
+    blkList.replaceChildren(...blocks.map((k) => {
+      const btn = el('button', { type: 'button', class: 'btn btn--ko', text: 'Débloquer' });
+      btn.addEventListener('click', () => removeBlock(k));
+      return el('li', { class: 'card' }, [
+        el('div', { class: 'card__top' }, [
+          el('span', { class: 'card__when', text: `${fmtDate(k.slot_date)} · ${timeRange(k)}` }),
+          el('span', { class: 'badge badge--declined', text: 'Bloqué' }),
+        ]),
+        el('p', { class: 'card__meta', text: `${fmtDur(k.duration_min)}${k.note ? ` · ${k.note}` : ''}` }),
+        el('div', { class: 'card__actions' }, [btn]),
+      ]);
+    }));
+  }
+
+  blkSize.addEventListener('change', fillTimes);
+  blkTime.addEventListener('change', updateBlockRange);
+  blkDate.addEventListener('change', renderBlocks);
+  blkForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const date = blkDate.value;
+    const time = blkTime.value;
+    const dur = sizeMin();
+    if (!dayOk() || date < todayParis()) return say('Choisissez une date à partir d\'aujourd\'hui.', true);
+    if (!time || slotMin(time) + dur > CLOSE_MIN) return say('Cette plage dépasse 05h30 : choisissez une heure plus tôt ou une taille plus petite.', true);
+    const probe = { slot_date: date, slot_time: time, duration_min: dur };
+    const clash = rows.find((r) => r.status === 'confirmed' && overlaps(r, probe));
+    if (clash && !window.confirm(`Un rendez-vous confirmé (${clash.full_name}, ${timeRange(clash)}) chevauche cette plage. Bloquer quand même ?`)) return;
+    const btn = $('#blk-submit');
+    btn.disabled = true;
+    say('Blocage…');
+    try {
+      const res = await fetch(`${cfg.supabaseUrl}/rest/v1/slot_blocks`, {
+        method: 'POST', headers: { ...headers(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ slot_date: date, slot_time: time, duration_min: dur, note: blkNote.value.trim() || null }),
+      });
+      if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
+      if (!res.ok) throw new Error();
+      say(`Plage bloquée : ${fmtDate(date)}, de ${time} à ${hmin(slotMin(time) + dur)}. Elle est grisée sur le site.`);
+      blkNote.value = '';
+      await fetchBlocks();
+    } catch { say('Le blocage a échoué. Réessayez.', true); }
+    btn.disabled = false;
+  });
+  initBlockForm();
 
   /* ---- check-in de position ---- */
   const ckSelect = $('#truck-select');
@@ -468,8 +607,9 @@
     showView(isAdmin() ? 'requests' : 'barber');
     fetchRows();
     fetchTrucks();
+    fetchBlocks();
     clearInterval(timer);
-    timer = setInterval(() => { fetchRows(); fetchTrucks(); }, 30000);
+    timer = setInterval(() => { fetchRows(); fetchTrucks(); fetchBlocks(); }, 30000);
   }
 
   loginForm.addEventListener('submit', async (e) => {

@@ -7,7 +7,9 @@
 --   * créneaux de départ toutes les 30 min, de 18h00 à 04h30 ; un rendez-vous doit finir avant 05h30 ;
 --   * offre groupe : 3 à 17 personnes (17 personnes = 9 h 00) ;
 --   * deux rendez-vous CONFIRMÉS ne peuvent pas se chevaucher le même soir (trigger, verrou par date) ;
---   * 00h00-04h30 appartiennent à la soirée du jour indiqué (+24 h).
+--   * 00h00-04h30 appartiennent à la soirée du jour indiqué (+24 h) ;
+--   * les chefs de projet peuvent bloquer / débloquer une plage à la main (table slot_blocks) : elle est grisée sur le site,
+--     refusée à la réservation et à la confirmation.
 
 -- 1. durée (30 + 30 × personnes) et horaires à la demi-heure
 alter table public.bookings add column if not exists duration_min int;
@@ -31,7 +33,38 @@ as $$
 $$;
 revoke all on function public.slot_minutes(text) from public, anon, authenticated;
 
--- 3. plages occupées par des rendez-vous confirmés (sans donnée personnelle) : utilisé par le site
+
+-- 2b. plages bloquées à la main par les chefs de projet (rôle admin uniquement ; jamais lisibles par le public)
+create table if not exists public.slot_blocks (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  created_by  uuid default auth.uid(),
+  slot_date   date not null,
+  slot_time   text not null check (slot_time ~ '^(18|19|2[0-3]|0[0-4])h(00|30)$'),
+  duration_min int not null check (duration_min between 60 and 540),
+  note        text check (note is null or char_length(note) <= 120),
+  constraint slot_blocks_fit_ck check (
+    substr(slot_time, 1, 2)::int * 60 + substr(slot_time, 4, 2)::int + case when substr(slot_time, 1, 2)::int < 6 then 1440 else 0 end + duration_min <= 1770
+  )
+);
+alter table public.slot_blocks enable row level security;
+revoke all on public.slot_blocks from anon, authenticated;
+grant select, insert, delete on public.slot_blocks to authenticated;
+
+drop policy if exists "admin lit les blocages" on public.slot_blocks;
+create policy "admin lit les blocages" on public.slot_blocks
+  for select to authenticated
+  using (((select auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
+drop policy if exists "admin bloque un creneau" on public.slot_blocks;
+create policy "admin bloque un creneau" on public.slot_blocks
+  for insert to authenticated
+  with check (((select auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
+drop policy if exists "admin debloque un creneau" on public.slot_blocks;
+create policy "admin debloque un creneau" on public.slot_blocks
+  for delete to authenticated
+  using (((select auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
+
+-- 3. plages occupées (rendez-vous confirmés + plages bloquées) (sans donnée personnelle) : utilisé par le site
 create or replace function public.get_busy_slots(p_from date, p_to date)
 returns table (slot_date date, slot_time text, duration_min int)
 language sql
@@ -42,7 +75,11 @@ as $$
   select b.slot_date, b.slot_time, b.duration_min
   from public.bookings b
   where b.status = 'confirmed'
-    and b.slot_date between p_from and least(p_to, p_from + 62);
+    and b.slot_date between p_from and least(p_to, p_from + 62)
+  union all
+  select k.slot_date, k.slot_time, k.duration_min
+  from public.slot_blocks k
+  where k.slot_date between p_from and least(p_to, p_from + 62);
 $$;
 revoke all on function public.get_busy_slots(date, date) from public;
 grant execute on function public.get_busy_slots(date, date) to anon, authenticated;
@@ -65,6 +102,15 @@ begin
       and public.slot_minutes(new.slot_time) < public.slot_minutes(b.slot_time) + coalesce(b.duration_min, 60)
   ) then
     raise exception 'slot_taken' using errcode = '23505';   -- 409 côté API : « créneau déjà confirmé »
+  end if;
+  -- plage bloquée à la main par un chef de projet
+  if exists (
+    select 1 from public.slot_blocks k
+    where k.slot_date = new.slot_date
+      and public.slot_minutes(k.slot_time) < public.slot_minutes(new.slot_time) + coalesce(new.duration_min, 60)
+      and public.slot_minutes(new.slot_time) < public.slot_minutes(k.slot_time) + k.duration_min
+  ) then
+    raise exception 'slot_blocked' using errcode = '23505';
   end if;
   return new;
 end;
@@ -137,12 +183,17 @@ begin
     raise exception 'too_many_requests';
   end if;
 
-  -- la plage demandée ne doit pas chevaucher un rendez-vous déjà confirmé
+  -- la plage demandée ne doit chevaucher ni un rendez-vous confirmé, ni une plage bloquée à la main
   if exists (
     select 1 from public.bookings b
     where b.slot_date = p_date and b.status = 'confirmed'
       and public.slot_minutes(b.slot_time) < v_start + v_dur
       and v_start < public.slot_minutes(b.slot_time) + coalesce(b.duration_min, 60)
+  ) or exists (
+    select 1 from public.slot_blocks k
+    where k.slot_date = p_date
+      and public.slot_minutes(k.slot_time) < v_start + v_dur
+      and v_start < public.slot_minutes(k.slot_time) + k.duration_min
   ) then
     raise exception 'slot_taken';
   end if;

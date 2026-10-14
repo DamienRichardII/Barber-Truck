@@ -163,3 +163,24 @@ body:has(#auth:not([hidden])) .bar{background:transparent;border-bottom:0;positi
 .card__note{margin:0;padding:.5rem .7rem;border-radius:.6rem;background:#fff6e0;color:#7a5500;font-size:.85rem;font-weight:500}
 .card__note.is-ko{background:#f9e6e4;color:var(--ko)}
 .plan__actions .card__note{flex-basis:100%}
+
+/* Créneaux : bloquer / débloquer à la main */
+.blocks__form{display:grid;gap:.8rem;margin:.8rem 0;padding:1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem}
+.blocks__form label{display:block;margin-bottom:.25rem;font-size:.85rem;font-weight:600}
+.blocks__row{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))}
+.blocks__range{margin:0;font-size:.9rem;font-weight:600}
+.blocks__range:empty{display:none}
+.blocks__sub{margin:1.4rem 0 .2rem;font-size:1.05rem}
+.blocks__grid{display:grid;gap:.4rem;grid-template-columns:repeat(auto-fill,minmax(4.4rem,1fr));margin:.6rem 0}
+.blocks__cell{min-height:2.6rem;padding:.2rem;border:1px solid #dcdcd7;border-radius:.6rem;background:#fff;font-size:.9rem;cursor:pointer;transition:border-color .15s,background .15s}
+.blocks__cell.is-free:hover{border-color:var(--ink)}
+.blocks__cell.is-blocked{background:#f6e4e2;border-color:#e2b8b4;color:var(--ko);font-weight:600;text-decoration:line-through}
+.blocks__cell.is-blocked:hover{background:#f0d3cf}
+.blocks__cell.is-booked{background:#e3f1e8;border-color:#b9d9c4;color:var(--ok);cursor:not-allowed}
+.blocks__legend{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;margin:.3rem 0 0;padding:0;list-style:none;font-size:.8rem;color:var(--muted)}
+.blocks__dot{display:inline-block;width:.8rem;height:.8rem;margin-right:.35rem;border:1px solid #dcdcd7;border-radius:.25rem;vertical-align:-.1rem}
+.blocks__dot.is-blocked{background:#f6e4e2;border-color:#e2b8b4}
+.blocks__dot.is-booked{background:#e3f1e8;border-color:#b9d9c4}
+#view-blocks .barber__title,#view-blocks .blocks__sub{color:#fff}
+#view-blocks .checkin__help,#view-blocks .msg,#view-blocks .blocks__legend{color:#b9b9b4}
+#view-blocks .msg.is-error{color:#ff8f86}

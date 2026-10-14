@@ -8,7 +8,7 @@
   <title>Administration – Barber Truck 93</title>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
-  <link rel="stylesheet" href="/admin/admin.css?v=20261010">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261016">
 </head>
 <body>
   <header class="bar">
@@ -59,10 +59,41 @@
       <nav class="views" id="views" aria-label="Sections de l'administration">
         <button type="button" data-view="requests" data-admin-only class="is-active">Demandes <span class="count" id="count-pending-nav">0</span></button>
         <button type="button" data-view="planning" data-admin-only>Planning</button>
+        <button type="button" data-view="blocks" data-admin-only>Créneaux</button>
         <button type="button" data-view="trucks">Camions</button>
         <button type="button" data-view="barbers" data-admin-only>Barbers <span class="count" id="count-barbers" hidden>0</span></button>
         <button type="button" data-view="barber">Coiffeur</button>
       </nav>
+
+      <div id="view-blocks" hidden>
+        <h2 class="barber__title">Bloquer / débloquer des créneaux</h2>
+        <p class="checkin__help">Bloquez à la main une plage horaire : elle devient indisponible sur le site. La durée dépend de la taille : 30 min de déplacement + 30 min par personne (solo 1 h, duo 1 h 30, trio 2 h, groupe de 4 : 2 h 30…). « Débloquer » rend la plage de nouveau disponible.</p>
+
+        <form class="blocks__form" id="block-form" novalidate>
+          <div class="blocks__row">
+            <div><label for="blk-date">Date</label><input id="blk-date" type="date" required></div>
+            <div><label for="blk-size">Taille</label><select id="blk-size"></select></div>
+            <div><label for="blk-time">Heure de début</label><select id="blk-time"></select></div>
+          </div>
+          <div><label for="blk-note">Note (facultatif, visible seulement ici)</label><input id="blk-note" type="text" maxlength="120" placeholder="Ex. : pause, trajet, absence" autocomplete="off"></div>
+          <p class="blocks__range" id="blk-range" aria-live="polite"></p>
+          <button class="btn btn--dark" id="blk-submit" type="submit">Bloquer ce créneau</button>
+        </form>
+        <p class="msg" id="blocks-msg" role="status"></p>
+
+        <h3 class="blocks__sub">Aperçu du jour choisi</h3>
+        <p class="checkin__help">Cliquez sur un créneau libre pour le choisir comme heure de début, ou sur un créneau bloqué pour le débloquer.</p>
+        <div class="blocks__grid" id="blk-grid" role="group" aria-label="Créneaux du jour choisi"></div>
+        <ul class="blocks__legend" aria-hidden="true">
+          <li><span class="blocks__dot is-free"></span>Libre</li>
+          <li><span class="blocks__dot is-blocked"></span>Bloqué</li>
+          <li><span class="blocks__dot is-booked"></span>Rendez-vous confirmé</li>
+        </ul>
+
+        <h3 class="blocks__sub">Plages bloquées à venir</h3>
+        <p class="msg" id="blocks-list-msg" role="status"></p>
+        <ul class="list" id="blocks-list"></ul>
+      </div>
 
       <div id="view-barbers" hidden>
         <h2 class="barber__title">Comptes barber</h2>
@@ -146,6 +177,6 @@
   </main>
 
   <script src="/js/config.js"></script>
-  <script src="/admin/admin.js?v=20261015"></script>
+  <script src="/admin/admin.js?v=20261016"></script>
 </body>
 </html>
