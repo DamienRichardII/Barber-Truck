@@ -14,6 +14,7 @@ window.BarberAPI = (() => {
     invalid_party_size: 'Nombre de personnes invalide pour cette prestation.',
     invalid_date: 'Cette date n\'est pas disponible.',
     invalid_slot: 'Cet horaire n\'est pas disponible.',
+    slot_passed: 'Cet horaire est déjà passé. Merci d\'en choisir un autre.',
     too_many_requests: 'Vous avez déjà plusieurs demandes en attente de confirmation.',
     not_configured: 'La réservation en ligne n\'est pas encore ouverte.',
     network: 'Connexion impossible. Vérifiez votre réseau et réessayez.',

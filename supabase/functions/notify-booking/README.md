@@ -15,3 +15,9 @@
    supabase secrets set --project-ref ebmprxugtwbxdemymlqh BREVO_API_KEY=xkeysib-xxx SMS_SENDER=BarberTruck NOTIFY_SMS_TO="0612345678"
 3. Redéploie la fonction (commande de l'étape 2). Sans BREVO_API_KEY, aucun SMS n'est envoyé.
 4. Erreurs d'envoi : Supabase > Edge Functions > notify-booking > Logs.
+
+## Anti-abus SMS
+
+- Au-delà de `SMS_DAILY_CAP` demandes en 24 h (60 par défaut, secret optionnel), les nouvelles demandes ne déclenchent plus de SMS
+  (confirmations / annulations et e-mails continuent). Le message « SMS cap atteint » apparaît alors dans les logs.
+- La base limite aussi à 3 demandes en attente et 4 demandes par 24 h pour un même numéro (`create_booking`).

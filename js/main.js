@@ -132,6 +132,21 @@
     const longDate = (d) => `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
     const takenStatus = (d, time) => state.taken.get(`${iso(d)}|${time}`);
 
+    /* heure de Paris (le créneau 00h00-02h00 d'une soirée tombe le lendemain) */
+    const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    function parisNow() {
+      const p = Object.fromEntries(PARIS.formatToParts(new Date()).map((x) => [x.type, x.value]));
+      return { date: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
+    }
+    function isPast(d, time) {
+      const hour = parseInt(time, 10);
+      const [y, mo, da] = iso(d).split('-').map(Number);
+      const slotDate = new Date(Date.UTC(y, mo - 1, da + (hour < 6 ? 1 : 0))).toISOString().slice(0, 10);
+      const now = parisNow();
+      return slotDate < now.date || (slotDate === now.date && hour * 60 <= now.minutes);
+    }
+    const fmtPhone = (p) => (/^0\d{9}$/.test(p) ? p.replace(/(\d{2})(?=\d)/g, '$1 ') : p);
+
     function setStatus(msg, isError = false) {
       statusEl.textContent = msg;
       statusEl.classList.toggle('is-error', isError);
@@ -214,7 +229,12 @@
         b.type = 'button';
         b.className = 'slot';
         b.dataset.time = time;
-        if (status) {
+        if (!status && isPast(state.date, time)) {
+          b.disabled = true;
+          b.classList.add('slot--booked');
+          b.textContent = time;
+          b.setAttribute('aria-label', `${time} – horaire passé`);
+        } else if (status) {
           b.disabled = true;
           b.classList.add(status === 'pending' ? 'slot--pending' : 'slot--booked');
           const label = document.createElement('span');
@@ -343,6 +363,13 @@
         return;
       }
       if (form.elements.website.value) return; // anti-spam (champ piège)
+      if (isPast(state.date, state.slot)) {
+        state.slot = null;
+        updateForm();
+        renderSlots();
+        setStatus('Cet horaire est déjà passé. Merci d\'en choisir un autre.', true);
+        return;
+      }
       const contact = validate();
       if (!contact) return;
 
@@ -364,7 +391,8 @@
         });
         form.hidden = true;
         doneText.textContent = `${state.serviceLabel} · ${cap(longDate(sent.date))} à ${sent.time}. `
-          + `Votre créneau est en attente de confirmation de notre part. Vous recevrez un e-mail à ${contact.email} dès qu'il est confirmé.`;
+          + `Votre créneau est en attente de confirmation de notre part. Dès qu'il est confirmé, vous recevrez un SMS au ${fmtPhone(contact.phone)} et un e-mail à ${contact.email}. `
+          + `Une question ? Appelez-nous au 07 58 04 13 74.`;
         doneEl.hidden = false;
         setStep(3);
         steps.forEach((li) => li.classList.add('is-done'));
@@ -394,7 +422,12 @@
     });
 
     /* mise à jour quand l'onglet redevient visible */
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadTaken(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (state.slot && isPast(state.date, state.slot)) { state.slot = null; updateForm(); }
+      loadTaken();
+      renderSlots();
+    });
 
     readService();
     renderCalendar();

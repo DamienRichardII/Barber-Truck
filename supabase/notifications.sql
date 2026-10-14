@@ -37,6 +37,9 @@ begin
   if p_service not in ('coupe-deplacement', 'offre-groupe') then raise exception 'invalid_service'; end if;
   if p_time not in ('18h00','19h00','20h00','21h00','22h00','23h00','00h00','01h00','02h00') then raise exception 'invalid_slot'; end if;
   if p_date is null or p_date < v_today or p_date > v_today + 120 then raise exception 'invalid_date'; end if;
+  -- créneau déjà passé aujourd'hui (heure de Paris ; 00h00-02h00 = lendemain de la soirée)
+  if p_date::timestamp + make_interval(hours => substr(p_time, 1, 2)::int + case when substr(p_time, 1, 2)::int < 6 then 24 else 0 end)
+     <= (now() at time zone 'Europe/Paris') then raise exception 'slot_passed'; end if;
   if char_length(v_name) < 2 or char_length(v_name) > 80 then raise exception 'invalid_name'; end if;
   if v_phone !~ '^\+?[0-9]{9,15}$' then raise exception 'invalid_phone'; end if;
   if v_email !~ '^[^\s@]+@[^\s@]+\.[^\s@]{2,}$' or char_length(v_email) > 120 then raise exception 'invalid_email'; end if;
@@ -51,6 +54,10 @@ begin
   end if;
 
   if (select count(*) from public.bookings where phone = v_phone and status = 'pending') >= 3 then
+    raise exception 'too_many_requests';
+  end if;
+  -- anti-abus SMS : 4 demandes maximum par numéro et par 24 h, quel que soit leur statut
+  if (select count(*) from public.bookings where phone = v_phone and created_at > now() - interval '24 hours') >= 4 then
     raise exception 'too_many_requests';
   end if;
 

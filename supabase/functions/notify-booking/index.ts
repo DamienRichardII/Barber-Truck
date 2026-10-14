@@ -1,15 +1,19 @@
 // Envoi des e-mails Resend + SMS Brevo : nouvelle demande (équipe + client), confirmation, annulation / refus (client).
 // Appelée par le trigger `bookings_notify` (voir supabase/notifications.sql).
 // Secrets requis : RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO, WEBHOOK_SECRET, SITE_URL (optionnel).
-// SMS (optionnels, désactivés sans BREVO_API_KEY) : BREVO_API_KEY, SMS_SENDER, NOTIFY_SMS_TO (numéros équipe, séparés par des virgules).
+// SMS (optionnels, désactivés sans BREVO_API_KEY) : BREVO_API_KEY, SMS_SENDER, NOTIFY_SMS_TO (numéros équipe, séparés par des virgules),
+// SMS_DAILY_CAP (anti-abus : au-delà de ce nombre de demandes en 24 h, plus de SMS sur les nouvelles demandes ; 60 par défaut).
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const FROM = Deno.env.get('NOTIFY_FROM') ?? 'Barber Truck 93 <onboarding@resend.dev>';
 const TO_TEAM = (Deno.env.get('NOTIFY_TO') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const SECRET = Deno.env.get('WEBHOOK_SECRET') ?? '';
-const SITE = Deno.env.get('SITE_URL') ?? 'https://barbertruck.vercel.app';
+const SITE = Deno.env.get('SITE_URL') ?? 'https://www.barbertruck.fr';
 const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') ?? '';
 const SMS_SENDER = Deno.env.get('SMS_SENDER') ?? 'BarberTruck';
+const SMS_DAILY_CAP = Number(Deno.env.get('SMS_DAILY_CAP') ?? '60');
+const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SB_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const SMS_TEAM = (Deno.env.get('NOTIFY_SMS_TO') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 type Booking = {
@@ -66,6 +70,24 @@ async function sms(phone: string, content: string) {
   } catch (e) { console.error('Brevo', e); }
 }
 
+// Anti-abus : le site est public et le numéro saisi n'est pas vérifié. Si le nombre de demandes des
+// dernières 24 h dépasse le plafond, on n'envoie plus de SMS pour les nouvelles demandes (les e-mails partent
+// toujours). En cas d'erreur de comptage, on bloque aussi : mieux vaut un SMS en moins qu'un compte vidé.
+async function newRequestSmsAllowed(): Promise<boolean> {
+  if (!BREVO_API_KEY) return false;
+  try {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const res = await fetch(`${SB_URL}/rest/v1/bookings?select=id&created_at=gte.${encodeURIComponent(since)}`, {
+      method: 'HEAD',
+      headers: { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}`, Prefer: 'count=exact' },
+    });
+    const total = Number((res.headers.get('content-range') ?? '').split('/')[1]);
+    if (!res.ok || !Number.isFinite(total)) { console.error('SMS cap: comptage impossible', res.status); return false; }
+    if (total > SMS_DAILY_CAP) { console.error(`SMS cap atteint (${total} demandes en 24 h > ${SMS_DAILY_CAP}) : aucun SMS envoyé`); return false; }
+    return true;
+  } catch (e) { console.error('SMS cap', e); return false; }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST' || !SECRET || req.headers.get('x-webhook-secret') !== SECRET) {
     return new Response('forbidden', { status: 403 });
@@ -87,7 +109,7 @@ Deno.serve(async (req) => {
         [...recap, ['Client', b.full_name], ['Téléphone', b.phone], ['E-mail', b.email ?? '—']],
       ), b.email ?? undefined);
       // SMS : équipe (nouvelle demande) + client (accusé de réception)
-      await Promise.all([
+      if (await newRequestSmsAllowed()) await Promise.all([
         ...SMS_TEAM.map((n) => sms(n, `Barber Truck : nouvelle demande ${when(b)} - ${b.full_name} ${b.phone}. Voir ${SITE}/admin/`)),
         sms(b.phone, `Barber Truck 93 : demande reçue pour ${when(b)}. Elle sera réservée après notre confirmation, vous recevrez un SMS.`),
       ]);

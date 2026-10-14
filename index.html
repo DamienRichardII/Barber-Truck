@@ -3,22 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Barber Truck 93 – Barber shop mobile en Île-de-France</title>
-  <meta name="description" content="Barber Truck 93, le barber shop mobile : un coiffeur de qualité qui se déplace près de chez vous en Île-de-France. Coupe + déplacement à 25 €, offre groupe à 20 € par personne.">
+  <title>Barber Truck 93 – Barber shop mobile à domicile en Île-de-France</title>
+  <meta name="description" content="Barber Truck 93, le barber shop mobile : un coiffeur de qualité qui se déplace chez vous en Île-de-France (93 et alentours), sur rendez-vous. Coupe + déplacement à 25 €, offre groupe à 20 € par personne. Réservation en ligne.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://www.barbertruck.fr/">
   <meta name="theme-color" content="#ffffff">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="fr_FR">
   <meta property="og:site_name" content="Barber Truck 93">
-  <meta property="og:url" content="https://barbertruck.vercel.app/">
-  <meta property="og:image" content="https://barbertruck.vercel.app/assets/img/og-image.jpg">
+  <meta property="og:url" content="https://www.barbertruck.fr/">
+  <meta property="og:image" content="https://www.barbertruck.fr/assets/img/og-image.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Logo Barber Truck 93">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Barber Truck 93 – Le barber shop mobile">
-  <meta name="twitter:image" content="https://barbertruck.vercel.app/assets/img/og-image.jpg">
+  <meta name="twitter:image" content="https://www.barbertruck.fr/assets/img/og-image.jpg">
   <meta property="og:title" content="Barber Truck 93 – Le barber shop mobile">
   <meta property="og:description" content="Un coiffeur de qualité, directement près de chez vous. Déplacement dans toute l'Île-de-France.">
+  <link rel="preconnect" href="https://ebmprxugtwbxdemymlqh.supabase.co" crossorigin>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/img/icon-192.png">
@@ -27,8 +30,48 @@
   <link rel="preload" href="assets/fonts/inter-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/img/hero-van.jpg" as="image">
   <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261008">
+  <link rel="stylesheet" href="css/style.css?v=20261014">
   <script>document.documentElement.classList.add('js');</script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://www.barbertruck.fr/#website",
+        "url": "https://www.barbertruck.fr/",
+        "name": "Barber Truck 93",
+        "inLanguage": "fr-FR"
+      },
+      {
+        "@type": "HairSalon",
+        "@id": "https://www.barbertruck.fr/#business",
+        "name": "Barber Truck 93",
+        "description": "Barber shop mobile : un coiffeur de qualité qui se déplace chez vous en Île-de-France, uniquement sur rendez-vous.",
+        "url": "https://www.barbertruck.fr/",
+        "image": "https://www.barbertruck.fr/assets/img/og-image.jpg",
+        "logo": "https://www.barbertruck.fr/assets/img/icon-512.png",
+        "telephone": "+33758041374",
+        "priceRange": "20 € - 25 €",
+        "areaServed": { "@type": "AdministrativeArea", "name": "Île-de-France" },
+        "sameAs": [
+          "https://www.instagram.com/barbertruck93/",
+          "https://www.tiktok.com/@barbertruck93",
+          "https://snapchat.com/t/9iEwNDB4"
+        ],
+        "potentialAction": { "@type": "ReserveAction", "target": "https://www.barbertruck.fr/#reservation", "name": "Prendre rendez-vous" },
+        "hasOfferCatalog": {
+          "@type": "OfferCatalog",
+          "name": "Prestations",
+          "itemListElement": [
+            { "@type": "Offer", "price": "25", "priceCurrency": "EUR", "itemOffered": { "@type": "Service", "name": "Coupe + déplacement" } },
+            { "@type": "Offer", "price": "20", "priceCurrency": "EUR", "description": "Par personne, minimum 3 personnes", "itemOffered": { "@type": "Service", "name": "Offre groupe" } }
+          ]
+        }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <a class="skip-link" href="#contenu">Aller au contenu</a>
@@ -206,7 +249,7 @@
 
         <form class="booking__form" id="booking-form" novalidate>
           <div class="booking__fields" id="booking-fields" hidden>
-            <p class="booking__hint">Renseignez vos coordonnées. Votre demande doit être confirmée par nos soins : le créneau n'est définitivement réservé qu'après notre confirmation.</p>
+            <p class="booking__hint">Renseignez vos coordonnées. Votre demande doit être confirmée par nos soins : le créneau n'est définitivement réservé qu'après notre confirmation, et vous êtes prévenu par SMS et par e-mail. Vos informations servent uniquement à traiter ce rendez-vous.</p>
             <div class="field">
               <label for="f-name">Nom et prénom</label>
               <input id="f-name" name="name" type="text" autocomplete="name" required minlength="2" maxlength="80">
