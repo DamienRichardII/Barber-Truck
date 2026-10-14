@@ -120,7 +120,7 @@
   }
 
   /* Un rendez-vous dure 30 min de déplacement + 30 min par personne (champ duration_min). Les créneaux sont à la demi-heure ;
-     00h00-04h30 appartiennent à la soirée du jour indiqué (+24 h). */
+     00h00-02h30 appartiennent à la soirée du jour indiqué (+24 h). */
   const slotMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
   const hmin = (m) => { const x = m % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}h${String(x % 60).padStart(2, '0')}`; };
   const durMin = (b) => b.duration_min || 60;
@@ -360,7 +360,7 @@
   /* ---- créneaux : bloquer / débloquer à la main (chefs de projet) ---- */
   const CLOSE_MIN = 29 * 60 + 30;                       // tout se termine avant 05h30
   const START_TIMES = [];
-  for (let m = 18 * 60; m <= CLOSE_MIN - 60; m += 30) START_TIMES.push(hmin(m));   // 18h00 … 04h30
+  for (let m = 18 * 60; m <= 26 * 60 + 30; m += 30) START_TIMES.push(hmin(m));   // 18h00 … 02h30 (comme sur le site)
   const blkForm = $('#block-form');
   const blkDate = $('#blk-date');
   const blkSize = $('#blk-size');
@@ -430,7 +430,7 @@
     if (!isAdmin()) return;
     /* aperçu du jour choisi : un bouton par demi-heure */
     const day = dayOk() ? blkDate.value : todayParis();
-    blkGrid.replaceChildren(...START_TIMES.concat(['05h00']).map((t) => {
+    blkGrid.replaceChildren(...START_TIMES.map((t) => {
       const m = slotMin(t);
       const k = blocks.find((x) => x.slot_date === day && slotMin(x.slot_time) < m + 30 && m < slotMin(x.slot_time) + x.duration_min);
       const r = rows.find((x) => x.status === 'confirmed' && x.slot_date === day && slotMin(x.slot_time) < m + 30 && m < slotMin(x.slot_time) + durMin(x));

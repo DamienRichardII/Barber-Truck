@@ -4,10 +4,10 @@
 --
 -- Règles :
 --   * durée = 30 + 30 × nombre de personnes (1 pers. = 1 h, 2 pers. = 1 h 30, groupe de 3 = 2 h, …) ;
---   * créneaux de départ toutes les 30 min, de 18h00 à 04h30 ; un rendez-vous doit finir avant 05h30 ;
+--   * créneaux de départ toutes les 30 min, de 18h00 à 02h30 ; un rendez-vous doit finir avant 05h30 ;
 --   * offre groupe : 3 à 17 personnes (17 personnes = 9 h 00) ;
 --   * deux rendez-vous CONFIRMÉS ne peuvent pas se chevaucher le même soir (trigger, verrou par date) ;
---   * 00h00-04h30 appartiennent à la soirée du jour indiqué (+24 h) ;
+--   * 00h00-02h30 appartiennent à la soirée du jour indiqué (+24 h) ;
 --   * les chefs de projet peuvent bloquer / débloquer une plage à la main (table slot_blocks) : elle est grisée sur le site,
 --     refusée à la réservation et à la confirmation.
 
@@ -18,7 +18,7 @@ alter table public.bookings alter column duration_min set not null;
 
 alter table public.bookings drop constraint if exists bookings_slot_time_check;
 alter table public.bookings add constraint bookings_slot_time_check
-  check (slot_time ~ '^(18|19|2[0-3]|0[0-4])h(00|30)$');
+  check (slot_time ~ '^(18|19|2[0-3]|0[0-2])h(00|30)$');
 alter table public.bookings drop constraint if exists bookings_duration_ck;
 alter table public.bookings add constraint bookings_duration_ck check (duration_min between 60 and 540);
 
@@ -40,7 +40,7 @@ create table if not exists public.slot_blocks (
   created_at  timestamptz not null default now(),
   created_by  uuid default auth.uid(),
   slot_date   date not null,
-  slot_time   text not null check (slot_time ~ '^(18|19|2[0-3]|0[0-4])h(00|30)$'),
+  slot_time   text not null check (slot_time ~ '^(18|19|2[0-3]|0[0-2])h(00|30)$'),
   duration_min int not null check (duration_min between 60 and 540),
   note        text check (note is null or char_length(note) <= 120),
   constraint slot_blocks_fit_ck check (
@@ -151,7 +151,8 @@ declare
   v_start int;
 begin
   if p_service not in ('coupe-deplacement', 'offre-groupe') then raise exception 'invalid_service'; end if;
-  if p_time is null or p_time !~ '^(18|19|2[0-3]|0[0-4])h(00|30)$' then raise exception 'invalid_slot'; end if;
+  -- départs toutes les 30 min, de 18h00 à 02h30
+  if p_time is null or p_time !~ '^(18|19|2[0-3]|0[0-2])h(00|30)$' then raise exception 'invalid_slot'; end if;
   if p_date is null or p_date < v_today or p_date > v_today + 120 then raise exception 'invalid_date'; end if;
 
   if p_service = 'offre-groupe' then
@@ -167,7 +168,7 @@ begin
   v_start := public.slot_minutes(p_time);
   if v_start + v_dur > 1770 then raise exception 'invalid_slot'; end if;
 
-  -- créneau déjà passé aujourd'hui (heure de Paris ; 00h00-04h30 = lendemain de la soirée)
+  -- créneau déjà passé aujourd'hui (heure de Paris ; 00h00-02h30 = lendemain de la soirée)
   if p_date::timestamp + make_interval(mins => v_start) <= (now() at time zone 'Europe/Paris') then raise exception 'slot_passed'; end if;
 
   if char_length(v_name) < 2 or char_length(v_name) > 80 then raise exception 'invalid_name'; end if;
