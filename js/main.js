@@ -7,9 +7,9 @@
 
   /* ---------- Données de démonstration ---------- */
   /* Planning à la demi-heure. Durée d'un rendez-vous = 30 min de déplacement + 30 min par personne
-     (1 personne : 1 h, 2 personnes : 1 h 30, groupe de 3 : 2 h…). Tout doit se terminer avant 03h00. */
+     (1 personne : 1 h, 2 personnes : 1 h 30, groupe de 3 : 2 h…). Tout doit se terminer avant 05h30. */
   const OPEN = 18 * 60;          // premier départ possible : 18h00
-  const CLOSE = 27 * 60;         // fin de soirée : 03h00 (lendemain)
+  const CLOSE = 29 * 60 + 30;    // fin de soirée : 05h30 (lendemain)
   const TRAVEL = 30;
   const PER_PERSON = 30;
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -18,7 +18,7 @@
   const durationFor = (n) => TRAVEL + PER_PERSON * n;
   const fmtDuration = (min) => { const h = Math.floor(min / 60); const m = min % 60; return h ? (m ? `${h} h ${pad2(m)}` : `${h} h`) : `${m} min`; };
   const SLOTS = [];
-  for (let m = OPEN; m <= CLOSE - 60; m += 30) SLOTS.push(fmtMin(m));   // 18h00 … 02h00
+  for (let m = OPEN; m <= CLOSE - 60; m += 30) SLOTS.push(fmtMin(m));   // 18h00 … 04h30
   const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
   const WEEKDAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
@@ -169,7 +169,7 @@
     };
     const currentDuration = () => durationFor(partyCount());
 
-    /* 'late' = finirait après 03h00 · 'past' = déjà passé · 'busy' = chevauche un rendez-vous confirmé · null = libre */
+    /* 'late' = finirait après 05h30 · 'past' = déjà passé · 'busy' = chevauche un rendez-vous confirmé · null = libre */
     function slotStatus(d, time) {
       const start = toMin(time);
       const end = start + currentDuration();

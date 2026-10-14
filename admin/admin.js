@@ -119,7 +119,7 @@
   }
 
   /* Un rendez-vous dure 30 min de déplacement + 30 min par personne (champ duration_min). Les créneaux sont à la demi-heure ;
-     00h00-02h30 appartiennent à la soirée du jour indiqué (+24 h). */
+     00h00-04h30 appartiennent à la soirée du jour indiqué (+24 h). */
   const slotMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
   const hmin = (m) => { const x = m % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}h${String(x % 60).padStart(2, '0')}`; };
   const durMin = (b) => b.duration_min || 60;

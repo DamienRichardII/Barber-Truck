@@ -20,7 +20,7 @@ type Booking = {
   full_name: string; phone: string; email: string | null; address: string;
 };
 
-// "mercredi 15 octobre de 20h30 à 22h00" (les créneaux 00h00-02h30 appartiennent à la soirée du jour indiqué)
+// "mercredi 15 octobre de 20h30 à 22h00" (les créneaux 00h00-04h30 appartiennent à la soirée du jour indiqué)
 const startMin = (t: string) => { const h = parseInt(t.slice(0, 2), 10); return h * 60 + parseInt(t.slice(3, 5), 10) + (h < 6 ? 1440 : 0); };
 const hm = (m: number) => { const x = m % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}h${String(x % 60).padStart(2, '0')}`; };
 const when = (b: Booking) => {
