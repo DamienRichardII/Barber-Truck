@@ -438,7 +438,7 @@
         form.hidden = true;
         doneText.textContent = `${state.serviceLabel} · ${cap(longDate(sent.date))} de ${sent.time} à ${sent.end}. `
           + `Votre créneau est en attente de confirmation de notre part. Dès qu'il est confirmé, vous recevrez un SMS au ${fmtPhone(contact.phone)}. `
-          + `Une question ? Appelez-nous au 07 58 04 13 74 ou écrivez-nous sur WhatsApp.`;
+          + `Une question ? Appelez-nous ou écrivez-nous sur WhatsApp au 07 59 04 73 74.`;
         doneEl.hidden = false;
         setStep(3);
         steps.forEach((li) => li.classList.add('is-done'));

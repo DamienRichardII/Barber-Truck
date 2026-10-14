@@ -79,11 +79,11 @@ Deno.serve(async (req) => {
         sms(b.phone, `Barber Truck 93 : demande enregistrée pour ${when(b)}. Nous la confirmons très vite par SMS.`),
       ]);
     } else if (payload.op === 'UPDATE' && b.status === 'confirmed') {
-      await sms(b.phone, `Barber Truck 93 : RDV confirmé ${when(b)}. Un souci ? Appelez le 07 58 04 13 74.`);
+      await sms(b.phone, `Barber Truck 93 : RDV confirmé ${when(b)}. Un souci ? Appelez le 07 59 04 73 74.`);
     } else if (payload.op === 'UPDATE' && b.status === 'declined') {
-      await sms(b.phone, `Barber Truck 93 : nous ne pouvons pas honorer le créneau du ${when(b)}. Autre créneau sur ${site} ou 07 58 04 13 74.`);
+      await sms(b.phone, `Barber Truck 93 : nous ne pouvons pas honorer le créneau du ${when(b)}. Autre créneau sur ${site} ou 07 59 04 73 74.`);
     } else if (payload.op === 'UPDATE' && b.status === 'cancelled') {
-      await sms(b.phone, `Barber Truck 93 : votre RDV du ${when(b)} est annulé. Nouveau créneau sur ${site} ou 07 58 04 13 74.`);
+      await sms(b.phone, `Barber Truck 93 : votre RDV du ${when(b)} est annulé. Nouveau créneau sur ${site} ou 07 59 04 73 74.`);
     }
   } catch (e) {
     console.error(e);
