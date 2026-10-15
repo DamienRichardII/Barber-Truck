@@ -43,10 +43,15 @@ create table if not exists public.slot_blocks (
   slot_time   text not null check (slot_time ~ '^(18|19|2[0-3]|0[0-2])h(00|30)$'),
   duration_min int not null check (duration_min between 60 and 540),
   note        text check (note is null or char_length(note) <= 120),
+  client_phone   text check (client_phone is null or client_phone ~ '^\+?[0-9]{9,15}$'),
+  client_address text check (client_address is null or char_length(client_address) between 8 and 200),
   constraint slot_blocks_fit_ck check (
     substr(slot_time, 1, 2)::int * 60 + substr(slot_time, 4, 2)::int + case when substr(slot_time, 1, 2)::int < 6 then 1440 else 0 end + duration_min <= 1770
   )
 );
+-- tables créées avant l'ajout du téléphone / de l'adresse du client
+alter table public.slot_blocks add column if not exists client_phone text check (client_phone is null or client_phone ~ '^\+?[0-9]{9,15}$');
+alter table public.slot_blocks add column if not exists client_address text check (client_address is null or char_length(client_address) between 8 and 200);
 alter table public.slot_blocks enable row level security;
 revoke all on public.slot_blocks from anon, authenticated;
 grant select, insert, delete on public.slot_blocks to authenticated;

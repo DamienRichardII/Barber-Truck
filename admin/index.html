@@ -8,7 +8,7 @@
   <title>Administration – Barber Truck 93</title>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
-  <link rel="stylesheet" href="/admin/admin.css?v=20261017">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261018">
 </head>
 <body>
   <header class="bar">
@@ -74,6 +74,10 @@
             <div><label for="blk-date">Date</label><input id="blk-date" type="date" required></div>
             <div><label for="blk-size">Taille</label><select id="blk-size"></select></div>
             <div><label for="blk-time">Heure de début</label><select id="blk-time"></select></div>
+          </div>
+          <div class="blocks__row">
+            <div><label for="blk-phone">Téléphone du client (facultatif)</label><input id="blk-phone" type="tel" inputmode="tel" autocomplete="off" maxlength="20" placeholder="06 12 34 56 78"></div>
+            <div class="blocks__wide"><label for="blk-address">Adresse du client (facultatif)</label><input id="blk-address" type="text" autocomplete="off" maxlength="200" placeholder="N°, rue, code postal, ville"></div>
           </div>
           <div><label for="blk-note">Note (facultatif, visible seulement ici)</label><input id="blk-note" type="text" maxlength="120" placeholder="Ex. : pause, trajet, absence" autocomplete="off"></div>
           <p class="blocks__range" id="blk-range" aria-live="polite"></p>
@@ -177,6 +181,6 @@
   </main>
 
   <script src="/js/config.js"></script>
-  <script src="/admin/admin.js?v=20261017"></script>
+  <script src="/admin/admin.js?v=20261018"></script>
 </body>
 </html>

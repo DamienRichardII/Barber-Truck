@@ -124,6 +124,9 @@
   const slotMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
   const hmin = (m) => { const x = m % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}h${String(x % 60).padStart(2, '0')}`; };
   const durMin = (b) => b.duration_min || 60;
+  /* Prix : 25 € par personne pour « Coupe + déplacement » (duo = 50 €), 20 € par personne pour l'offre groupe. */
+  const priceOf = (b) => (b.service === 'offre-groupe' ? 20 : 25) * b.party_size;
+  const eur = (n) => `${n} €`;
   const endTime = (b) => hmin(slotMin(b.slot_time) + durMin(b));
   const fmtDur = (m) => `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}` : ''}`;
   const timeRange = (b) => `${b.slot_time} → ${endTime(b)}`;
@@ -152,7 +155,7 @@
       ...(b.email ? [el('dt', { text: 'E-mail' }), el('dd', {}, [el('a', { href: `mailto:${b.email}`, text: b.email })])] : []),
       el('dt', { text: 'Adresse' }), el('dd', {}, [addr]),
       el('dt', { text: 'Prestation' }), el('dd', { text: `${SERVICES[b.service] || b.service} · ${b.party_size} ${b.party_size > 1 ? 'personnes' : 'personne'} · ${fmtDur(durMin(b))}` }),
-      ...(readOnly ? [] : [el('dt', { text: 'Prix' }), el('dd', { text: `${b.service === 'offre-groupe' ? 20 * b.party_size : 25} €` })]),
+      ...(readOnly ? [] : [el('dt', { text: 'Prix' }), el('dd', { text: eur(priceOf(b)) })]),
     ]);
     const btns = el('div', { class: 'card__actions' });
     const act = (label, cls, status) => {
@@ -299,8 +302,6 @@
 
   /* ---- rôles : admin = tout ; barber (coiffeur) = Camions + Coiffeur ---- */
   const isAdmin = () => Boolean(session && session.role === 'admin');
-  const priceOf = (b) => (b.service === 'offre-groupe' ? 20 * b.party_size : 25);
-  const eur = (n) => `${n} €`;
   async function closeBooking(id, outcome, bt) {
     const msg = $('#barber-msg'); msg.classList.remove('is-error'); bt.disabled = true;
     try {
@@ -400,6 +401,8 @@
   const blkSize = $('#blk-size');
   const blkTime = $('#blk-time');
   const blkNote = $('#blk-note');
+  const blkPhone = $('#blk-phone');
+  const blkAddress = $('#blk-address');
   const blkRange = $('#blk-range');
   const blkMsg = $('#blocks-msg');
   const blkGrid = $('#blk-grid');
@@ -469,7 +472,7 @@
       const k = blocks.find((x) => x.slot_date === day && slotMin(x.slot_time) < m + 30 && m < slotMin(x.slot_time) + x.duration_min);
       const r = rows.find((x) => x.status === 'confirmed' && x.slot_date === day && slotMin(x.slot_time) < m + 30 && m < slotMin(x.slot_time) + durMin(x));
       const state = r ? 'booked' : k ? 'blocked' : 'free';
-      const b = el('button', { type: 'button', class: `blocks__cell is-${state}`, text: t, title: r ? `${r.full_name} · ${timeRange(r)}` : k ? `${timeRange(k)}${k.note ? ` · ${k.note}` : ''}` : 'Libre' });
+      const b = el('button', { type: 'button', class: `blocks__cell is-${state}`, text: t, title: r ? `${r.full_name} · ${timeRange(r)}` : k ? `${timeRange(k)}${k.note ? ` · ${k.note}` : ''}${k.client_phone ? ` · ${fmtPhone(k.client_phone)}` : ''}${k.client_address ? ` · ${k.client_address}` : ''}` : 'Libre' });
       if (state === 'booked') b.disabled = true;
       b.addEventListener('click', () => {
         if (state === 'blocked') return removeBlock(k);
@@ -489,6 +492,10 @@
           el('span', { class: 'badge badge--declined', text: 'Bloqué' }),
         ]),
         el('p', { class: 'card__meta', text: `${fmtDur(k.duration_min)}${k.note ? ` · ${k.note}` : ''}` }),
+        ...(k.client_phone || k.client_address ? [el('dl', {}, [
+          ...(k.client_phone ? [el('dt', { text: 'Téléphone' }), el('dd', {}, [el('a', { href: `tel:${k.client_phone}`, text: fmtPhone(k.client_phone) })])] : []),
+          ...(k.client_address ? [el('dt', { text: 'Adresse' }), el('dd', {}, [el('a', { href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(k.client_address)}`, target: '_blank', rel: 'noopener noreferrer', text: k.client_address })])] : []),
+        ])] : []),
         el('div', { class: 'card__actions' }, [btn]),
       ]);
     }));
@@ -504,6 +511,10 @@
     const dur = sizeMin();
     if (!dayOk() || date < todayParis()) return say('Choisissez une date à partir d\'aujourd\'hui.', true);
     if (!time || slotMin(time) + dur > CLOSE_MIN) return say('Cette plage dépasse 05h30 : choisissez une heure plus tôt ou une taille plus petite.', true);
+    const phone = blkPhone.value.replace(/[^\d+]/g, '');
+    const address = blkAddress.value.trim();
+    if (phone && !/^\+?\d{9,15}$/.test(phone)) return say('Numéro de téléphone du client invalide.', true);
+    if (address && address.length < 8) return say('Adresse du client trop courte (8 caractères minimum).', true);
     const probe = { slot_date: date, slot_time: time, duration_min: dur };
     const clash = rows.find((r) => r.status === 'confirmed' && overlaps(r, probe));
     if (clash && !window.confirm(`Un rendez-vous confirmé (${clash.full_name}, ${timeRange(clash)}) chevauche cette plage. Bloquer quand même ?`)) return;
@@ -513,12 +524,12 @@
     try {
       const res = await fetch(`${cfg.supabaseUrl}/rest/v1/slot_blocks`, {
         method: 'POST', headers: { ...headers(), Prefer: 'return=minimal' },
-        body: JSON.stringify({ slot_date: date, slot_time: time, duration_min: dur, note: blkNote.value.trim() || null }),
+        body: JSON.stringify({ slot_date: date, slot_time: time, duration_min: dur, note: blkNote.value.trim() || null, client_phone: phone || null, client_address: address || null }),
       });
       if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
       if (!res.ok) throw new Error();
       say(`Plage bloquée : ${fmtDate(date)}, de ${time} à ${hmin(slotMin(time) + dur)}. Elle est grisée sur le site.`);
-      blkNote.value = '';
+      blkNote.value = ''; blkPhone.value = ''; blkAddress.value = '';
       await fetchBlocks();
     } catch { say('Le blocage a échoué. Réessayez.', true); }
     btn.disabled = false;
