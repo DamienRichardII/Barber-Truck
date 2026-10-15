@@ -124,8 +124,8 @@
   const slotMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
   const hmin = (m) => { const x = m % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}h${String(x % 60).padStart(2, '0')}`; };
   const durMin = (b) => b.duration_min || 60;
-  /* Prix : 25 € par personne pour « Coupe + déplacement » (duo = 50 €), 20 € par personne pour l'offre groupe. */
-  const priceOf = (b) => (b.service === 'offre-groupe' ? 20 : 25) * b.party_size;
+  /* Prix : 25 € par personne, pour toutes les prestations (duo 50 €, trio 75 €, groupe de 4 : 100 €…). */
+  const priceOf = (b) => 25 * b.party_size;
   const eur = (n) => `${n} €`;
   const endTime = (b) => hmin(slotMin(b.slot_time) + durMin(b));
   const fmtDur = (m) => `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}` : ''}`;

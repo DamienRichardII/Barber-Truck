@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Barber Truck 93 – Barber shop mobile à domicile en Île-de-France</title>
-  <meta name="description" content="Barber Truck 93, le barber shop mobile : un coiffeur de qualité qui se déplace chez vous en Île-de-France (93 et alentours), sur rendez-vous. Coupe + déplacement à 25 €, offre groupe à 20 € par personne. Réservation en ligne.">
+  <meta name="description" content="Barber Truck 93, le barber shop mobile : un coiffeur de qualité qui se déplace chez vous en Île-de-France (93 et alentours), sur rendez-vous. Coupe + déplacement à 25 € par personne (duo 50 €), offre groupe à 25 € par personne. Réservation en ligne.">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://www.barbertruck.fr/">
   <meta name="theme-color" content="#ffffff">
@@ -30,7 +30,7 @@
   <link rel="preload" href="assets/fonts/inter-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/img/hero-van.jpg" as="image">
   <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261015">
+  <link rel="stylesheet" href="css/style.css?v=20261016">
   <script>document.documentElement.classList.add('js');</script>
   <script type="application/ld+json">
   {
@@ -52,7 +52,7 @@
         "image": "https://www.barbertruck.fr/assets/img/og-image.jpg",
         "logo": "https://www.barbertruck.fr/assets/img/icon-512.png",
         "telephone": "+33759047374",
-        "priceRange": "20 € - 25 €",
+        "priceRange": "25 € par personne",
         "areaServed": { "@type": "AdministrativeArea", "name": "Île-de-France" },
         "sameAs": [
           "https://www.instagram.com/barbertruck93/",
@@ -64,8 +64,8 @@
           "@type": "OfferCatalog",
           "name": "Prestations",
           "itemListElement": [
-            { "@type": "Offer", "price": "25", "priceCurrency": "EUR", "itemOffered": { "@type": "Service", "name": "Coupe + déplacement" } },
-            { "@type": "Offer", "price": "20", "priceCurrency": "EUR", "description": "Par personne, minimum 3 personnes", "itemOffered": { "@type": "Service", "name": "Offre groupe" } }
+            { "@type": "Offer", "price": "25", "priceCurrency": "EUR", "description": "Par personne (duo : 50 €)", "itemOffered": { "@type": "Service", "name": "Coupe + déplacement" } },
+            { "@type": "Offer", "price": "25", "priceCurrency": "EUR", "description": "Par personne, minimum 3 personnes", "itemOffered": { "@type": "Service", "name": "Offre groupe" } }
           ]
         }
       }
@@ -221,7 +221,7 @@
             <label class="pick">
               <input class="pick__input" type="radio" name="service" value="offre-groupe" data-label="Offre groupe">
               <img class="pick__thumb" src="assets/img/thumb-3.jpg" alt="" width="56" height="56" loading="lazy">
-              <span class="pick__text"><span class="pick__name">Offre groupe</span><span class="pick__price">20 € par personne</span><span class="pick__note">Minimum 3 personnes</span></span>
+              <span class="pick__text"><span class="pick__name">Offre groupe</span><span class="pick__price">25 € par personne</span><span class="pick__note">Minimum 3 personnes</span></span>
               <span class="pick__radio" aria-hidden="true"></span>
             </label>
             <div class="party" id="field-party">
@@ -232,6 +232,7 @@
                 <button class="party__btn" type="button" data-party="1" aria-label="Une personne de plus"><span aria-hidden="true">+</span></button>
               </div>
               <p class="party__duration" id="party-duration" aria-live="polite"></p>
+              <p class="party__price" id="party-price" aria-live="polite"></p>
             </div>
           </fieldset>
 
@@ -332,8 +333,8 @@
           </div>
           <div class="card__body">
             <h3 class="card__title">Offre groupe</h3>
-            <p class="card__price">20 € par personne <span class="card__note">· minimum 3 personnes</span></p>
-            <a class="card__cta" href="#reservation" data-service="offre-groupe" aria-label="Réserver : Offre groupe, 20 € par personne, minimum 3 personnes"><svg class="icon" aria-hidden="true"><use href="#i-chev-circle"/></svg></a>
+            <p class="card__price">25 € par personne <span class="card__note">· minimum 3 personnes</span></p>
+            <a class="card__cta" href="#reservation" data-service="offre-groupe" aria-label="Réserver : Offre groupe, 25 € par personne, minimum 3 personnes"><svg class="icon" aria-hidden="true"><use href="#i-chev-circle"/></svg></a>
           </div>
         </li>
       </ul>
