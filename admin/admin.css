@@ -191,3 +191,7 @@ body:has(#auth:not([hidden])) .bar{background:transparent;border-bottom:0;positi
 .blocks__wide{grid-column:span 2}
 @media (max-width:560px){.blocks__wide{grid-column:auto}}
 #view-blocks .card dl{font-size:.9rem}
+
+/* Rendez-vous passé en attente de « RDV validé / non validé » */
+.plan tr.row.needs-validation{background:#fff6dd}
+@media (min-width:761px){.plan tr.row.needs-validation td:first-child{box-shadow:inset 4px 0 0 var(--wait)}}

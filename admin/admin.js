@@ -127,6 +127,34 @@
   /* Prix : 25 € par personne, pour toutes les prestations (duo 50 €, trio 75 €, groupe de 4 : 100 €…). */
   const priceOf = (b) => 25 * b.party_size;
   const eur = (n) => `${n} €`;
+
+  /* Un rendez-vous confirmé reste dans le planning tant qu'il n'a pas été clôturé (« RDV validé » ou « RDV non validé »),
+     même une fois la date passée (ou minuit dépassé). « À valider » = confirmé, terminé, pas encore clôturé. */
+  const nowParisMin = () => {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    return Number(p.hour) * 60 + Number(p.minute);
+  };
+  const dayDiff = (a, b) => { const u = (d) => { const [y, m, j] = d.split('-').map(Number); return Date.UTC(y, m - 1, j); }; return Math.round((u(b) - u(a)) / 86400000); };
+  const isFinished = (b) => dayDiff(b.slot_date, todayParis()) * 1440 + nowParisMin() >= slotMin(b.slot_time) + durMin(b);
+  const isOpen = (b) => b.status === 'confirmed' && !b.outcome;          // confirmé, pas encore clôturé
+  const toValidate = (b) => isOpen(b) && isFinished(b);
+  const statusBadge = (b) => {
+    if (b.status === 'confirmed') {
+      if (b.outcome === 'done') return ['RDV validé', 'confirmed'];
+      if (b.outcome === 'no_show') return ['RDV non validé', 'cancelled'];
+      if (isFinished(b)) return ['À valider', 'pending'];
+    }
+    return [STATUS[b.status] || b.status, b.status];
+  };
+  function outcomeButtons(b, container) {
+    const add = (label, cls, outcome) => {
+      const bt = el('button', { type: 'button', class: `btn ${cls}`, text: label });
+      bt.addEventListener('click', () => closeBooking(b.id, outcome, bt));
+      container.append(bt);
+    };
+    if (b.outcome) add('Rouvrir', 'btn--ghost', null);
+    else { add('RDV validé', 'btn--ok', 'done'); add('RDV non validé', 'btn--ko', 'no_show'); }
+  }
   const endTime = (b) => hmin(slotMin(b.slot_time) + durMin(b));
   const fmtDur = (m) => `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}` : ''}`;
   const timeRange = (b) => `${b.slot_time} → ${endTime(b)}`;
@@ -164,12 +192,12 @@
       btns.append(bt);
     };
     if (!readOnly && b.status === 'pending') { if (blockOf(b)) { /* confirmation impossible tant que la plage est bloquée */ } else if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, btns); act('Refuser', 'btn--ko', 'declined'); }
-    if (!readOnly && b.status === 'confirmed') act('Annuler le rendez-vous', 'btn--ko', 'cancelled');
+    if (!readOnly && b.status === 'confirmed') { outcomeButtons(b, btns); act('Annuler le rendez-vous', 'btn--ko', 'cancelled'); }
     const created = new Date(b.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     return el('li', { class: 'card' }, [
       el('div', { class: 'card__top' }, [
         el('span', { class: 'card__when', text: `${fmtDate(b.slot_date)} · ${timeRange(b)}` }),
-        el('span', { class: `badge badge--${b.status}`, text: STATUS[b.status] || b.status }),
+        el('span', { class: `badge badge--${statusBadge(b)[1]}`, text: statusBadge(b)[0] }),
       ]),
       dl, ...(readOnly ? [] : [...(slotNote(b) ? [el('p', { class: `card__note${slotTaken(b) || blockOf(b) ? ' is-ko' : ''}`, text: slotNote(b) })] : []), btns, el('p', { class: 'card__meta', text: `Demande reçue le ${created}` })]),
     ]);
@@ -206,9 +234,9 @@
     const qDigits = q.replace(/\D/g, '');
     return rows.filter((r) => {
       const p = planPeriod.value;
-      if (p === 'upcoming' && r.slot_date < today) return false;
-      if (p === 'today' && r.slot_date !== today) return false;
-      if (p === 'past' && r.slot_date >= today) return false;
+      if (p === 'upcoming' && r.slot_date < today && !isOpen(r)) return false;     // + les rendez-vous passés pas encore clôturés
+      if (p === 'today' && r.slot_date !== today && !toValidate(r)) return false;
+      if (p === 'past' && (r.slot_date >= today || isOpen(r))) return false;       // « passées » = déjà clôturées ou annulées
       const s = planStatus.value;
       if (s === 'active' && !['pending', 'confirmed'].includes(r.status)) return false;
       if (s === 'closed' && !['declined', 'cancelled'].includes(r.status)) return false;
@@ -226,6 +254,7 @@
     const n = (f) => rows.filter(f).length;
     const stats = [
       [n((r) => r.status === 'pending'), 'À traiter'],
+      [n(toValidate), 'À valider (RDV passés)'],
       [n((r) => r.status === 'confirmed' && r.slot_date === today), 'Confirmées aujourd\'hui'],
       [n((r) => r.status === 'confirmed' && r.slot_date > today), 'Confirmées à venir'],
       [rows.filter((r) => r.status === 'confirmed' && r.slot_date >= today).reduce((s, r) => s + r.party_size, 0), 'Personnes à couper (à venir)'],
@@ -248,9 +277,9 @@
       acts.append(bt);
     };
     if (b.status === 'pending') { if (blockOf(b)) { /* confirmation impossible tant que la plage est bloquée */ } else if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, acts); act('Refuser', 'btn--ko', 'declined'); }
-    if (b.status === 'confirmed') act('Annuler', 'btn--ko', 'cancelled');
+    if (b.status === 'confirmed') { outcomeButtons(b, acts); act('Annuler', 'btn--ko', 'cancelled'); }
     if (slotNote(b)) acts.append(el('p', { class: `card__note${slotTaken(b) || blockOf(b) ? ' is-ko' : ''}`, text: slotNote(b) }));
-    const tr = el('tr', { class: `row is-${b.status}` });
+    const tr = el('tr', { class: `row is-${b.status}${toValidate(b) ? ' needs-validation' : ''}` });
     tr.append(
       td('Heure', document.createTextNode(`${timeRange(b)} (${fmtDur(durMin(b))})`), 'plan__time'),
       td('Client', document.createTextNode(b.full_name)),
@@ -258,7 +287,7 @@
       td('Adresse', addr),
       td('Prestation', document.createTextNode(SERVICES[b.service] || b.service)),
       td('Personnes', document.createTextNode(peopleLabel(b.party_size))),
-      td('Statut', el('span', { class: `badge badge--${b.status}`, text: STATUS[b.status] || b.status })),
+      td('Statut', el('span', { class: `badge badge--${statusBadge(b)[1]}`, text: statusBadge(b)[0] })),
       td('Reçue le', document.createTextNode(fmtShort(b.created_at))),
       td('Actions', acts, 'plan__actionscell'),
     );
@@ -303,14 +332,14 @@
   /* ---- rôles : admin = tout ; barber (coiffeur) = Camions + Coiffeur ---- */
   const isAdmin = () => Boolean(session && session.role === 'admin');
   async function closeBooking(id, outcome, bt) {
-    const msg = $('#barber-msg'); msg.classList.remove('is-error'); bt.disabled = true;
+    const msg = !$('#view-barber').hidden ? $('#barber-msg') : !$('#view-planning').hidden ? planMsg : listMsg; msg.classList.remove('is-error'); bt.disabled = true;
     try {
       const res = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/close_booking`, { method: 'POST', headers: headers(), body: JSON.stringify({ p_id: id, p_outcome: outcome }) });
       if (res.status === 401) return logout('Session expirée, reconnectez-vous.');
       if (!res.ok) throw new Error();
       const r = rows.find((x) => x.id === id);
       if (r) { r.outcome = outcome; r.closed_at = outcome ? new Date().toISOString() : null; }
-      renderBarber();
+      render();
     } catch { msg.textContent = 'Action impossible, réessayez.'; msg.classList.add('is-error'); bt.disabled = false; }
   }
   function barberCard(b) {
@@ -334,7 +363,7 @@
   function renderBarber() {
     const byDate = (a, b) => (a.slot_date < b.slot_date ? -1 : a.slot_date > b.slot_date ? 1 : slotRank(a.slot_time) - slotRank(b.slot_time));
     const today = todayParis();
-    const open = rows.filter((r) => r.status === 'confirmed' && !r.outcome).sort(byDate);
+    const open = rows.filter(isOpen).sort(byDate);   // y compris les rendez-vous passés non clôturés
     const done = rows.filter((r) => r.status === 'confirmed' && r.outcome && r.slot_date >= today).sort(byDate);
     const total = open.reduce((s, r) => s + priceOf(r), 0);
     $('#barber-msg').textContent = open.length ? `${open.length} rendez-vous à réaliser · ${eur(total)} à encaisser au total.` : 'Aucun rendez-vous à réaliser.';
