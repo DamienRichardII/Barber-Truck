@@ -13,10 +13,11 @@
   const CLOSE = 29 * 60 + 30;    // un rendez-vous doit se terminer avant 05h30 (lendemain)
   const TRAVEL = 30;
   const PER_PERSON = 30;
-  /* Tarifs : 1 personne 25 € ; à partir de 2 personnes 20 € par personne (duo 40 €, trio 60 €, groupe de 4 80 €…) */
-  const SOLO_PRICE = 25;
+  /* Tarifs : 25 € par personne jusqu'à 2 personnes (1 pers. 25 €, duo 50 €) ;
+     à partir de 3 personnes (offre groupe) 20 € par personne (trio 60 €, groupe de 4 80 €, 5 : 100 €, 6 : 120 €…) */
+  const SINGLE_PRICE = 25;
   const GROUP_PRICE = 20;
-  const unitPrice = (n) => (n === 1 ? SOLO_PRICE : GROUP_PRICE);
+  const unitPrice = (n) => (n >= 3 ? GROUP_PRICE : SINGLE_PRICE);
   const priceFor = (n) => n * unitPrice(n);
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmtMin = (m) => `${pad2(Math.floor((m % 1440) / 60))}h${pad2(m % 60)}`;

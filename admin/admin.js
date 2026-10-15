@@ -124,8 +124,8 @@
   const slotMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
   const hmin = (m) => { const x = m % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}h${String(x % 60).padStart(2, '0')}`; };
   const durMin = (b) => b.duration_min || 60;
-  /* Prix : 1 personne 25 € ; à partir de 2 personnes 20 € par personne (duo 40 €, trio 60 €, groupe de 4 : 80 €…). */
-  const priceOf = (b) => (b.party_size === 1 ? 25 : 20 * b.party_size);
+  /* Prix : 25 € par personne jusqu'à 2 personnes (duo 50 €) ; 20 € par personne à partir de 3 (trio 60 €, groupe de 4 : 80 €…). */
+  const priceOf = (b) => (b.party_size >= 3 ? 20 : 25) * b.party_size;
   const eur = (n) => `${n} €`;
 
   /* Un rendez-vous confirmé reste dans le planning tant qu'il n'a pas été clôturé (« RDV validé » ou « RDV non validé »),
