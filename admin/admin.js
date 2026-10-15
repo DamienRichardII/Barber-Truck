@@ -152,6 +152,7 @@
       ...(b.email ? [el('dt', { text: 'E-mail' }), el('dd', {}, [el('a', { href: `mailto:${b.email}`, text: b.email })])] : []),
       el('dt', { text: 'Adresse' }), el('dd', {}, [addr]),
       el('dt', { text: 'Prestation' }), el('dd', { text: `${SERVICES[b.service] || b.service} · ${b.party_size} ${b.party_size > 1 ? 'personnes' : 'personne'} · ${fmtDur(durMin(b))}` }),
+      ...(readOnly ? [] : [el('dt', { text: 'Prix' }), el('dd', { text: `${b.service === 'offre-groupe' ? 20 * b.party_size : 25} €` })]),
     ]);
     const btns = el('div', { class: 'card__actions' });
     const act = (label, cls, status) => {
@@ -298,12 +299,45 @@
 
   /* ---- rôles : admin = tout ; barber (coiffeur) = Camions + Coiffeur ---- */
   const isAdmin = () => Boolean(session && session.role === 'admin');
+  const priceOf = (b) => (b.service === 'offre-groupe' ? 20 * b.party_size : 25);
+  const eur = (n) => `${n} €`;
+  async function closeBooking(id, outcome, bt) {
+    const msg = $('#barber-msg'); msg.classList.remove('is-error'); bt.disabled = true;
+    try {
+      const res = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/close_booking`, { method: 'POST', headers: headers(), body: JSON.stringify({ p_id: id, p_outcome: outcome }) });
+      if (res.status === 401) return logout('Session expirée, reconnectez-vous.');
+      if (!res.ok) throw new Error();
+      const r = rows.find((x) => x.id === id);
+      if (r) { r.outcome = outcome; r.closed_at = outcome ? new Date().toISOString() : null; }
+      renderBarber();
+    } catch { msg.textContent = 'Action impossible, réessayez.'; msg.classList.add('is-error'); bt.disabled = false; }
+  }
+  function barberCard(b) {
+    const li = card(b, true);
+    li.querySelector('dl').append(el('dt', { text: 'À encaisser' }), el('dd', { class: 'card__price', text: eur(priceOf(b)) }));
+    const btns = el('div', { class: 'card__actions' });
+    const act = (label, cls, outcome) => {
+      const bt = el('button', { type: 'button', class: `btn ${cls}`, text: label });
+      bt.addEventListener('click', () => closeBooking(b.id, outcome, bt));
+      btns.append(bt);
+    };
+    if (b.outcome) {
+      const badge = li.querySelector('.badge');
+      badge.textContent = b.outcome === 'done' ? 'RDV validé' : 'RDV non validé';
+      badge.className = `badge badge--${b.outcome === 'done' ? 'confirmed' : 'cancelled'}`;
+      act('Rouvrir', 'btn--ko', null);
+    } else { act('RDV validé', 'btn--ok', 'done'); act('RDV non validé', 'btn--ko', 'no_show'); }
+    li.append(btns);
+    return li;
+  }
   function renderBarber() {
+    const byDate = (a, b) => (a.slot_date < b.slot_date ? -1 : a.slot_date > b.slot_date ? 1 : slotRank(a.slot_time) - slotRank(b.slot_time));
     const today = todayParis();
-    const mine = rows.filter((r) => r.status === 'confirmed' && r.slot_date >= today)
-      .sort((a, b) => (a.slot_date < b.slot_date ? -1 : a.slot_date > b.slot_date ? 1 : slotRank(a.slot_time) - slotRank(b.slot_time)));
-    $('#barber-msg').textContent = mine.length ? '' : 'Aucun rendez-vous confirmé à venir.';
-    $('#barber-list').replaceChildren(...mine.map((b) => card(b, true)));
+    const open = rows.filter((r) => r.status === 'confirmed' && !r.outcome).sort(byDate);
+    const done = rows.filter((r) => r.status === 'confirmed' && r.outcome && r.slot_date >= today).sort(byDate);
+    const total = open.reduce((s, r) => s + priceOf(r), 0);
+    $('#barber-msg').textContent = open.length ? `${open.length} rendez-vous à réaliser · ${eur(total)} à encaisser au total.` : 'Aucun rendez-vous à réaliser.';
+    $('#barber-list').replaceChildren(...open.map(barberCard), ...(done.length ? [el('li', { class: 'card__sep', text: 'Clôturés' })] : []), ...done.map(barberCard));
   }
 
   /* ---- comptes barber (chefs de projet) ---- */
