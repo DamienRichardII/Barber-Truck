@@ -13,7 +13,11 @@
   const CLOSE = 29 * 60 + 30;    // un rendez-vous doit se terminer avant 05h30 (lendemain)
   const TRAVEL = 30;
   const PER_PERSON = 30;
-  const PRICE_PER_PERSON = 25;   // 25 € par personne : 1 pers. 25 €, duo 50 €, trio 75 €, groupe de 4 100 €…
+  /* Tarifs : 1 personne 25 € ; à partir de 2 personnes 20 € par personne (duo 40 €, trio 60 €, groupe de 4 80 €…) */
+  const SOLO_PRICE = 25;
+  const GROUP_PRICE = 20;
+  const unitPrice = (n) => (n === 1 ? SOLO_PRICE : GROUP_PRICE);
+  const priceFor = (n) => n * unitPrice(n);
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmtMin = (m) => `${pad2(Math.floor((m % 1440) / 60))}h${pad2(m % 60)}`;
   const toMin = (t) => { const h = parseInt(t, 10); return h * 60 + parseInt(t.slice(3), 10) + (h < 6 ? 1440 : 0); };
@@ -197,7 +201,7 @@
     function updateDuration() {
       const n = partyCount();
       durationEl.textContent = `Durée du rendez-vous : ${fmtDuration(durationFor(n))} (30 min de déplacement + 30 min par personne).`;
-      priceEl.textContent = `Prix : ${n * PRICE_PER_PERSON} €${n > 1 ? ` (${n} × ${PRICE_PER_PERSON} €)` : ''}`;
+      priceEl.textContent = `Prix : ${priceFor(n)} €${n > 1 ? ` (${n} × ${unitPrice(n)} €)` : ''}`;
     }
 
     function readService() {
@@ -427,7 +431,7 @@
       confirmBtn.classList.add('is-loading');
       confirmBtn.setAttribute('aria-disabled', 'true');
       setStatus('Envoi de votre demande…');
-      const sent = { price: contact.partySize * PRICE_PER_PERSON, date: new Date(state.date), time: state.slot, end: fmtMin(toMin(state.slot) + durationFor(contact.partySize)) };
+      const sent = { price: priceFor(contact.partySize), date: new Date(state.date), time: state.slot, end: fmtMin(toMin(state.slot) + durationFor(contact.partySize)) };
       try {
         await api.createBooking({
           service: state.service,
