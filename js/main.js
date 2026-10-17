@@ -130,6 +130,8 @@
     const partyInput = $('#f-party', root);
     const durationEl = $('#party-duration', root);
     const priceEl = $('#party-price', root);
+    const choiceEl = $('#party-choice', root);
+    const stepperEl = $('#party-stepper', root);
     const confirmBtn = $('#booking-confirm', root);
     const statusEl = $('#booking-status', root);
     const doneEl = $('#booking-done', root);
@@ -146,6 +148,7 @@
       serviceLabel: '',
       busy: new Map(), // "YYYY-MM-DD" -> [[début, fin], …] en minutes (rendez-vous confirmés)
       sending: false,
+      partyChosen: false,   // « Coupe + déplacement » : le client doit choisir explicitement 1 ou 2 personnes
     };
 
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -176,6 +179,9 @@
       return Number.isInteger(n) && n >= lo && n <= hi ? n : lo;
     };
     const currentDuration = () => durationFor(partyCount());
+    /* L'offre groupe a toujours un nombre de personnes (3 au minimum). « Coupe + déplacement » exige un choix explicite : 1 ou 2. */
+    const isGroup = () => state.service === 'offre-groupe';
+    const partyReady = () => isGroup() || state.partyChosen;
 
     /* 'late' = finirait après 05h30 · 'past' = déjà passé · 'busy' = chevauche un rendez-vous confirmé · null = libre */
     function slotStatus(d, time) {
@@ -200,6 +206,12 @@
     }
 
     function updateDuration() {
+      priceEl.classList.toggle('is-hint', !partyReady());
+      if (!partyReady()) {
+        durationEl.textContent = '';
+        priceEl.textContent = 'Choisissez 1 ou 2 personnes pour voir la durée, le prix et les horaires disponibles.';
+        return;
+      }
       const n = partyCount();
       durationEl.textContent = `Durée du rendez-vous : ${fmtDuration(durationFor(n))} (30 min de déplacement + 30 min par personne).`;
       priceEl.textContent = `Prix : ${priceFor(n)} €${n > 1 ? ` (${n} × ${unitPrice(n)} €)` : ''}`;
@@ -213,15 +225,37 @@
       const pl = $('#l-party', root);
       partyInput.min = group ? '3' : '1';
       partyInput.max = group ? '17' : '2';
-      pl.textContent = group ? 'Nombre de personnes (minimum 3)' : 'Nombre de personnes (1 ou 2)';
-      const cur = Number(partyInput.value);
-      if (!Number.isInteger(cur) || cur < Number(partyInput.min) || cur > Number(partyInput.max)) partyInput.value = partyInput.min;
+      pl.textContent = group ? 'Nombre de personnes (minimum 3)' : 'Nombre de personnes : choisissez 1 ou 2';
+      choiceEl.hidden = group;      // coupe + déplacement : deux cases « 1 » et « 2 »
+      stepperEl.hidden = !group;    // offre groupe : − / + à partir de 3
+    }
+
+    /* Nouveau départ pour le nombre de personnes : aucune case cochée pour la coupe (choix obligatoire), 3 pour le groupe. */
+    function resetParty() {
+      state.partyChosen = false;
+      partyInput.value = isGroup() ? partyInput.min : '';
+      $$('input[name="party-choice"]', root).forEach((i) => { i.checked = false; });
+    }
+
+    /* Rappel visible quand le client oublie de choisir : message près des horaires + cases mises en évidence. */
+    function askParty() {
+      const msg = 'Choisissez d\'abord le nombre de personnes (1 ou 2) pour réserver un horaire.';
+      rangeEl.textContent = msg;
+      rangeEl.classList.add('is-hint');
+      setStatus(msg, true);
+      choiceEl.classList.remove('is-attn');
+      void choiceEl.offsetWidth;
+      choiceEl.classList.add('is-attn');
+      setTimeout(() => choiceEl.classList.remove('is-attn'), 1600);
+      choiceEl.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+      const first = $('input[name="party-choice"]', root);
+      if (first) first.focus({ preventScroll: true });
     }
 
     /* après un changement de prestation / de nombre de personnes : la durée change, donc les créneaux libres aussi */
     function refresh() {
       updateDuration();
-      if (state.slot && slotStatus(state.date, state.slot)) state.slot = null;
+      if (state.slot && (!partyReady() || slotStatus(state.date, state.slot))) state.slot = null;
       renderSlots();
       updateForm();
     }
@@ -292,6 +326,10 @@
           b.disabled = true;
           b.classList.add('slot--booked');
           b.setAttribute('aria-label', `${time} – ${LABELS[status]}`);
+        } else if (!partyReady()) {
+          b.classList.add('slot--locked');   // libre, mais verrouillé tant que le nombre de personnes n'est pas choisi
+          b.setAttribute('aria-disabled', 'true');
+          b.setAttribute('aria-label', `${time} – choisissez d'abord le nombre de personnes`);
         } else {
           b.setAttribute('aria-pressed', String(state.slot === time));
           if (state.slot === time) b.classList.add('is-selected');
@@ -299,9 +337,12 @@
         frag.append(b);
       });
       slotsEl.replaceChildren(frag);
-      rangeEl.textContent = state.slot
-        ? `Votre rendez-vous : de ${state.slot} à ${fmtMin(toMin(state.slot) + currentDuration())} (déplacement inclus).`
-        : '';
+      rangeEl.classList.toggle('is-hint', !partyReady());
+      rangeEl.textContent = !partyReady()
+        ? 'Choisissez d\'abord le nombre de personnes (1 ou 2) : les horaires se débloquent ensuite.'
+        : state.slot
+          ? `Votre rendez-vous : de ${state.slot} à ${fmtMin(toMin(state.slot) + currentDuration())} (déplacement inclus).`
+          : '';
     }
 
     /* champs de contact visibles dès qu'un créneau est choisi */
@@ -324,6 +365,7 @@
       const hi = Number(partyInput.max);
       const n = Number(partyInput.value);
       const checks = [
+        [$('input[name="party-choice"]', root), partyReady(), 'Choisissez 1 ou 2 personnes.'],
         [f.name, f.name.value.trim().length >= 2, 'Merci d\'indiquer votre nom et prénom.'],
         [f.phone, /^\+?\d{9,15}$/.test(phone), 'Merci d\'indiquer un numéro de téléphone valide.'],
         [f.address, f.address.value.trim().length >= 8, 'Merci d\'indiquer votre adresse complète.'],
@@ -352,15 +394,23 @@
       setStatus('');
       setStep(1);
       readService();
-      partyInput.value = partyInput.min;
+      resetParty();
       refresh();
     }
 
-    /* prestation */
+    /* prestation / choix 1 ou 2 personnes */
     root.addEventListener('change', (e) => {
+      if (e.target.name === 'party-choice') {
+        state.partyChosen = true;
+        partyInput.value = e.target.value;
+        clearInvalid();
+        setStatus('');
+        refresh();
+        return;
+      }
       if (e.target.name !== 'service') return;
       readService();
-      partyInput.value = partyInput.min;
+      resetParty();
       setStatus('');
       setStep(2);
       refresh();
@@ -403,6 +453,7 @@
     slotsEl.addEventListener('click', (e) => {
       const btn = e.target.closest('.slot');
       if (!btn || btn.disabled) return;
+      if (!partyReady()) return askParty();   // le client n'a pas encore choisi 1 ou 2 personnes
       state.slot = btn.dataset.time;
       setStatus('');
       renderSlots();
@@ -472,7 +523,7 @@
         if (!input) return;
         input.checked = true;
         readService();
-        partyInput.value = partyInput.min;
+        resetParty();
         refresh();
         setStep(2);
       });
@@ -486,6 +537,7 @@
     });
 
     readService();
+    resetParty();
     updateDuration();
     renderCalendar();
     renderSlots();

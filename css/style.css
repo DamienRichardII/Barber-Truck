@@ -303,8 +303,25 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .party__btn{display:grid;place-items:center;width:2.4rem;height:2.4rem;border:1px solid #dcdcd8;border-radius:.4rem;background:#fff;font-size:1.2rem;line-height:1;color:var(--ink);cursor:pointer;transition:border-color .2s,background-color .2s}
 .party__btn:hover{border-color:var(--ink)}
 .party__btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.party__label{margin:0}
+.party__choice{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;padding:.15rem;border-radius:.7rem}
+.party__choice[hidden],.party__ctl[hidden]{display:none}
+.party__opt{position:relative;display:grid;place-items:center;align-content:center;gap:.1rem;min-height:3.6rem;padding:.4rem;border:1.5px solid #dcdcd8;border-radius:.6rem;background:#fff;text-align:center;cursor:pointer;transition:border-color .15s,background-color .15s,color .15s}
+.party__opt input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.party__num{font-size:1.6rem;font-weight:700;line-height:1}
+.party__unit{font-size:.74rem;color:var(--muted)}
+.party__opt:hover{border-color:var(--ink)}
+.party__opt:has(input:checked){background:var(--ink);border-color:var(--ink);color:#fff}
+.party__opt:has(input:checked) .party__unit{color:#e4e4e1}
+.party__opt:has(input:focus-visible){outline:2px solid var(--ink);outline-offset:2px}
+.party__choice.is-attn{animation:party-nudge .55s ease both;box-shadow:0 0 0 3px rgba(192,57,43,.35)}
+@keyframes party-nudge{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 .party__duration{font-size:.72rem;line-height:1.4;color:var(--muted)}
+.party__duration:empty{display:none}
 .party__price{font-size:.9rem;font-weight:700;color:var(--ink)}
+.party__price.is-hint{font-size:.8rem;font-weight:500;color:#b03a2e}
+.slot--locked{opacity:.5}
+.slots__range.is-hint{color:#b03a2e;font-weight:600}
 .slots__range{margin-top:.6rem;font-size:.78rem;font-weight:500;line-height:1.4}
 .slots__range:empty{display:none}
 .booking__help{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.6rem 1rem;margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--line)}
@@ -479,6 +496,10 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
   .party__btn{width:1.7rem;height:1.7rem;font-size:.9rem}
   .party__duration{font-size:.5rem}
   .party__price{font-size:.62rem}
+  .party__choice{gap:.35rem}
+  .party__opt{min-height:2.3rem}
+  .party__num{font-size:1rem}
+  .party__unit{font-size:.5rem}
   .slots__range{font-size:.55rem;margin-top:.35rem}
   .booking__help{margin-top:.7rem;padding-top:.6rem}
   .booking__help p{font-size:.58rem}
@@ -570,7 +591,7 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .truck-pin.is-live .tp-photo{animation:truck-pulse 2.4s ease-out infinite}
 .truck-pin:not(.is-live) .tp-photo{filter:grayscale(1)}
 @keyframes truck-pulse{0%{box-shadow:0 3px 12px rgba(0,0,0,.35),0 0 0 0 rgba(255,255,255,.7)}70%,100%{box-shadow:0 3px 12px rgba(0,0,0,.35),0 0 0 16px rgba(255,255,255,0)}}
-@media (prefers-reduced-motion:reduce){.truck-pin.is-live .tp-photo{animation:none}}
+@media (prefers-reduced-motion:reduce){.truck-pin.is-live .tp-photo{animation:none}.party__choice.is-attn{animation:none}}
 @media (max-width:520px){.tp-card{padding:.24rem 1.3rem .24rem .4rem;font-size:.47rem}.tp-card strong{font-size:.52rem}}
 
 /* carte OpenFreeMap (MapLibre) */

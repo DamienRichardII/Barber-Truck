@@ -30,7 +30,7 @@
   <link rel="preload" href="assets/fonts/inter-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/img/hero-van.jpg" as="image">
   <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20261018">
+  <link rel="stylesheet" href="css/style.css?v=20261019">
   <script>document.documentElement.classList.add('js');</script>
   <script type="application/ld+json">
   {
@@ -225,10 +225,14 @@
               <span class="pick__radio" aria-hidden="true"></span>
             </label>
             <div class="party" id="field-party">
-              <label class="party__label" for="f-party" id="l-party">Nombre de personnes (1 ou 2)</label>
-              <div class="party__ctl">
+              <p class="party__label" id="l-party">Nombre de personnes : choisissez 1 ou 2</p>
+              <div class="party__choice" id="party-choice" role="radiogroup" aria-labelledby="l-party">
+                <label class="party__opt"><input type="radio" name="party-choice" value="1"><span class="party__num">1</span><span class="party__unit">personne</span></label>
+                <label class="party__opt"><input type="radio" name="party-choice" value="2"><span class="party__num">2</span><span class="party__unit">personnes</span></label>
+              </div>
+              <div class="party__ctl" id="party-stepper" hidden>
                 <button class="party__btn" type="button" data-party="-1" aria-label="Une personne de moins"><span aria-hidden="true">−</span></button>
-                <input id="f-party" name="party" type="number" inputmode="numeric" min="1" max="2" value="1">
+                <input id="f-party" name="party" type="number" inputmode="numeric" min="3" max="17" value="" aria-labelledby="l-party">
                 <button class="party__btn" type="button" data-party="1" aria-label="Une personne de plus"><span aria-hidden="true">+</span></button>
               </div>
               <p class="party__duration" id="party-duration" aria-live="polite"></p>
