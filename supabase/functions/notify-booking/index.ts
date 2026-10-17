@@ -32,16 +32,22 @@ const when = (b: Booking) => {
 const intl = (p: string) => p.replace(/[^0-9+]/g, '').replace(/^\+/, '').replace(/^00/, '').replace(/^0/, '33');
 
 // Un SMS qui échoue est seulement journalisé : il ne doit jamais faire échouer la réservation.
+// Une 2e tentative est faite en cas d'erreur réseau ou d'erreur serveur Brevo (5xx) ; une erreur 4xx (clé, crédits,
+// expéditeur, numéro) est définitive : inutile de réessayer, elle apparaît dans les logs (« Brevo 4xx … »).
 async function sms(phone: string, content: string) {
   if (!BREVO_API_KEY || !phone) return;
-  try {
-    const res = await fetch('https://api.brevo.com/v3/transactionalSMS/send', {
-      method: 'POST',
-      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ sender: SMS_SENDER, recipient: intl(phone), content, type: 'transactional' }),
-    });
-    if (!res.ok) console.error('Brevo', res.status, await res.text());
-  } catch (e) { console.error('Brevo', e); }
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/transactionalSMS/send', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ sender: SMS_SENDER, recipient: intl(phone), content, type: 'transactional' }),
+      });
+      if (res.ok) return;
+      console.error('Brevo', res.status, await res.text(), `(tentative ${attempt})`);
+      if (res.status < 500) return;
+    } catch (e) { console.error('Brevo', e, `(tentative ${attempt})`); }
+  }
 }
 
 // Anti-abus : le site est public et le numéro saisi n'est pas vérifié. Si le nombre de demandes des

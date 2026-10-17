@@ -100,9 +100,11 @@
       body: JSON.stringify({ status }),
     });
     if (res.status === 401 || res.status === 403) return logout('Session expirée, reconnectez-vous.');
-    if (res.status === 409) { listMsg.textContent = 'Ce créneau est déjà pris (rendez-vous confirmé ou plage bloquée).'; listMsg.classList.add('is-error'); button.disabled = false; return; }
-    if (!res.ok) { listMsg.textContent = 'La modification a échoué.'; listMsg.classList.add('is-error'); button.disabled = false; return; }
+    const msg = activeMsg();
+    if (res.status === 409) { msg.textContent = 'Ce créneau est déjà pris (rendez-vous confirmé ou plage bloquée).'; msg.classList.add('is-error'); button.disabled = false; return; }
+    if (!res.ok) { msg.textContent = status === 'cancelled' ? 'L\'annulation a échoué. Réessayez.' : 'La modification a échoué.'; msg.classList.add('is-error'); button.disabled = false; return; }
     await fetchRows();
+    if (status === 'cancelled') { const m = activeMsg(); m.classList.remove('is-error'); m.textContent = 'Rendez-vous annulé : le créneau est libéré et le client reçoit un SMS d\'annulation.'; }
   }
 
   const fmtDate = (iso) => {
@@ -146,6 +148,16 @@
     }
     return [STATUS[b.status] || b.status, b.status];
   };
+  const activeMsg = () => (!$('#view-barber').hidden ? $('#barber-msg') : !$('#view-planning').hidden ? planMsg : listMsg);
+  /* Annulation d'un rendez-vous déjà confirmé (chefs de projet) : le créneau est libéré et le client reçoit un SMS d'annulation. */
+  function cancelButton(b, container, label = 'Annuler le rendez-vous') {
+    const bt = el('button', { type: 'button', class: 'btn btn--ko', text: label });
+    bt.addEventListener('click', () => {
+      if (!window.confirm(`Annuler ce rendez-vous ?\n${fmtDate(b.slot_date)} · ${timeRange(b)}\n${b.full_name} · ${fmtPhone(b.phone)}\n\nLe créneau sera libéré et le client sera prévenu par SMS.`)) return;
+      setStatus(b.id, 'cancelled', bt);
+    });
+    container.append(bt);
+  }
   function outcomeButtons(b, container) {
     const add = (label, cls, outcome) => {
       const bt = el('button', { type: 'button', class: `btn ${cls}`, text: label });
@@ -192,7 +204,7 @@
       btns.append(bt);
     };
     if (!readOnly && b.status === 'pending') { if (blockOf(b)) { /* confirmation impossible tant que la plage est bloquée */ } else if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, btns); act('Refuser', 'btn--ko', 'declined'); }
-    if (!readOnly && b.status === 'confirmed') { outcomeButtons(b, btns); act('Annuler le rendez-vous', 'btn--ko', 'cancelled'); }
+    if (!readOnly && b.status === 'confirmed') { outcomeButtons(b, btns); cancelButton(b, btns); }
     const created = new Date(b.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     return el('li', { class: 'card' }, [
       el('div', { class: 'card__top' }, [
@@ -277,7 +289,7 @@
       acts.append(bt);
     };
     if (b.status === 'pending') { if (blockOf(b)) { /* confirmation impossible tant que la plage est bloquée */ } else if (!slotTaken(b)) act('Confirmer', 'btn--ok', 'confirmed'); else replaceButton(b, acts); act('Refuser', 'btn--ko', 'declined'); }
-    if (b.status === 'confirmed') { outcomeButtons(b, acts); act('Annuler', 'btn--ko', 'cancelled'); }
+    if (b.status === 'confirmed') { outcomeButtons(b, acts); cancelButton(b, acts, 'Annuler'); }
     if (slotNote(b)) acts.append(el('p', { class: `card__note${slotTaken(b) || blockOf(b) ? ' is-ko' : ''}`, text: slotNote(b) }));
     const tr = el('tr', { class: `row is-${b.status}${toValidate(b) ? ' needs-validation' : ''}` });
     tr.append(
@@ -332,7 +344,7 @@
   /* ---- rôles : admin = tout ; barber (coiffeur) = Camions + Coiffeur ---- */
   const isAdmin = () => Boolean(session && session.role === 'admin');
   async function closeBooking(id, outcome, bt) {
-    const msg = !$('#view-barber').hidden ? $('#barber-msg') : !$('#view-planning').hidden ? planMsg : listMsg; msg.classList.remove('is-error'); bt.disabled = true;
+    const msg = activeMsg(); msg.classList.remove('is-error'); bt.disabled = true;
     try {
       const res = await fetch(`${cfg.supabaseUrl}/rest/v1/rpc/close_booking`, { method: 'POST', headers: headers(), body: JSON.stringify({ p_id: id, p_outcome: outcome }) });
       if (res.status === 401) return logout('Session expirée, reconnectez-vous.');
@@ -357,6 +369,7 @@
       badge.className = `badge badge--${b.outcome === 'done' ? 'confirmed' : 'cancelled'}`;
       act('Rouvrir', 'btn--ko', null);
     } else { act('RDV validé', 'btn--ok', 'done'); act('RDV non validé', 'btn--ko', 'no_show'); }
+    if (isAdmin()) cancelButton(b, btns);   // les chefs de projet peuvent aussi annuler depuis la vue Coiffeur
     li.append(btns);
     return li;
   }
