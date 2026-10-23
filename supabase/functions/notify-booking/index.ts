@@ -12,6 +12,10 @@ const SMS_SENDER = Deno.env.get('SMS_SENDER') ?? 'BarberTruck';
 const SMS_DAILY_CAP = Number(Deno.env.get('SMS_DAILY_CAP') ?? '60');
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+// E-mail à l'équipe (Resend) : 2e canal pour les nouvelles demandes, en plus du SMS. Secrets : RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO.
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
+const MAIL_FROM = Deno.env.get('NOTIFY_FROM') ?? 'Barber Truck 93 <onboarding@resend.dev>';
+const MAIL_TEAM = (Deno.env.get('NOTIFY_TO') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const SMS_TEAM = (Deno.env.get('NOTIFY_SMS_TO') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 type Booking = {
@@ -35,7 +39,8 @@ const intl = (p: string) => p.replace(/[^0-9+]/g, '').replace(/^\+/, '').replace
 // Une 2e tentative est faite en cas d'erreur réseau ou d'erreur serveur Brevo (5xx) ; une erreur 4xx (clé, crédits,
 // expéditeur, numéro) est définitive : inutile de réessayer, elle apparaît dans les logs (« Brevo 4xx … »).
 async function sms(phone: string, content: string) {
-  if (!BREVO_API_KEY || !phone) return;
+  if (!BREVO_API_KEY) { console.error('BREVO_API_KEY manquant : SMS non envoyé'); return; }
+  if (!phone) { console.error('Numéro vide : SMS non envoyé'); return; }
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const res = await fetch('https://api.brevo.com/v3/transactionalSMS/send', {
@@ -43,18 +48,32 @@ async function sms(phone: string, content: string) {
         headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ sender: SMS_SENDER, recipient: intl(phone), content, type: 'transactional' }),
       });
-      if (res.ok) return;
+      if (res.ok) { console.log('SMS envoyé', res.status); return; }
       console.error('Brevo', res.status, await res.text(), `(tentative ${attempt})`);
       if (res.status < 500) return;
     } catch (e) { console.error('Brevo', e, `(tentative ${attempt})`); }
   }
 }
 
+const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+async function mailTeam(subject: string, lines: string[]) {
+  if (!RESEND_API_KEY || MAIL_TEAM.length === 0) { console.error('E-mail équipe non envoyé : RESEND_API_KEY ou NOTIFY_TO manquant'); return; }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: MAIL_FROM, to: MAIL_TEAM, subject, html: `<div style="font-family:Arial,sans-serif;line-height:1.5">${lines.map((l) => `<p style="margin:0 0 6px">${esc(l)}</p>`).join('')}</div>` }),
+    });
+    if (res.ok) console.log('E-mail équipe envoyé'); else console.error('Resend', res.status, await res.text());
+  } catch (e) { console.error('Resend', e); }
+}
+
 // Anti-abus : le site est public et le numéro saisi n'est pas vérifié. Si le nombre de demandes des
 // dernières 24 h dépasse le plafond, on n'envoie plus de SMS pour les nouvelles demandes.
 // En cas d'erreur de comptage, on bloque aussi : mieux vaut un SMS en moins qu'un compte vidé.
 async function newRequestSmsAllowed(): Promise<boolean> {
-  if (!BREVO_API_KEY) return false;
+  if (!BREVO_API_KEY) { console.error('BREVO_API_KEY manquant : aucun SMS pour les nouvelles demandes'); return false; }
+  if (SMS_TEAM.length === 0) console.error('NOTIFY_SMS_TO vide : l\'équipe ne sera pas prévenue');
   try {
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const res = await fetch(`${SB_URL}/rest/v1/bookings?select=id&created_at=gte.${encodeURIComponent(since)}`, {
@@ -77,9 +96,11 @@ Deno.serve(async (req) => {
   const b = payload.record;
   if (!b || !b.id) return new Response('bad request', { status: 400 });
 
+  console.log(`notify ${payload.op} ${b.status} · brevo=${BREVO_API_KEY ? 'ok' : 'MANQUANT'} · equipe=${SMS_TEAM.length}`);
   const site = SITE.replace('https://', '');
   try {
     if (payload.op === 'INSERT' && b.status === 'pending') {
+      await mailTeam(`Nouvelle demande de RDV – ${when(b)}`, [`Nouvelle demande : ${when(b)}`, `Client : ${b.full_name} · ${b.phone}`, `Adresse : ${b.address}`, `Prestation : ${b.service} · ${b.party_size} pers.`, `Administration : ${SITE}/admin/`]);
       if (await newRequestSmsAllowed()) await Promise.all([
         ...SMS_TEAM.map((n) => sms(n, `Barber Truck : nouvelle demande ${when(b)} - ${b.full_name} ${b.phone} (${b.party_size} pers.). Voir ${SITE}/admin/`)),
         sms(b.phone, `Barber Truck 93 : demande enregistrée pour ${when(b)}. Nous la confirmons très vite par SMS.`),

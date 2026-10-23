@@ -138,8 +138,16 @@
     const doneText = $('#booking-done-text', root);
     const steps = $$('.steps__item', root);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    /* « Jour de service » (heure de Paris) : la soirée du jour J court jusqu'à 02h30 le lendemain. Entre 00h00 et 03h00 on reste donc
+       sur la soirée de la veille, pour que les créneaux 00h00-02h30 encore à venir restent réservables après minuit. */
+    function serviceDay() {
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date()).map((x) => [x.type, x.value]));
+      const d = new Date(Number(p.year), Number(p.month) - 1, Number(p.day));
+      if (Number(p.hour) < 3) d.setDate(d.getDate() - 1);
+      return d;
+    }
+    const today = serviceDay();
     const state = {
       view: new Date(today.getFullYear(), today.getMonth(), 1),
       date: new Date(today),

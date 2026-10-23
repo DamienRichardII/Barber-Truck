@@ -158,7 +158,8 @@ begin
   if p_service not in ('coupe-deplacement', 'offre-groupe') then raise exception 'invalid_service'; end if;
   -- départs toutes les 30 min, de 18h00 à 02h30
   if p_time is null or p_time !~ '^(18|19|2[0-3]|0[0-2])h(00|30)$' then raise exception 'invalid_slot'; end if;
-  if p_date is null or p_date < v_today or p_date > v_today + 120 then raise exception 'invalid_date'; end if;
+  -- la soirée d'hier reste réservable après minuit (créneaux 00h00-02h30 encore à venir) ; slot_passed écarte ce qui est passé
+  if p_date is null or p_date < v_today - 1 or p_date > v_today + 120 then raise exception 'invalid_date'; end if;
 
   if p_service = 'offre-groupe' then
     v_size := coalesce(p_party_size, 0);
