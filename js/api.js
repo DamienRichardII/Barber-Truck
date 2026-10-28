@@ -12,6 +12,7 @@ window.BarberAPI = (() => {
     invalid_email: 'Merci d\'indiquer une adresse e-mail valide.',
     invalid_address: 'Merci d\'indiquer une adresse complète.',
     invalid_party_size: 'Nombre de personnes invalide pour cette prestation.',
+    closed_day: 'Le Barber Truck est fermé le lundi. Merci de choisir un autre jour.',
     invalid_date: 'Cette date n\'est pas disponible.',
     invalid_slot: 'Cet horaire n\'est pas disponible.',
     slot_passed: 'Cet horaire est déjà passé. Merci d\'en choisir un autre.',

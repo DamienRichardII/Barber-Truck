@@ -211,6 +211,8 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .day--available{background:var(--chip)}
 .day--available:hover{background:#dcdcd8;transform:scale(1.08)}
 .day--disabled{color:var(--faint);cursor:default}
+.day--closed{text-decoration:line-through}
+.calendar__note{margin:.6rem 0 0;font-size:.78rem;color:var(--muted,#6b6b68);text-align:center}
 .day--selected,.day--selected:hover{background:var(--ink);color:#fff;transform:scale(1.06)}
 
 .slots__date{font-size:.85rem;font-weight:600}

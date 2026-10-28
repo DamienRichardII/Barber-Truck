@@ -148,9 +148,12 @@
       return d;
     }
     const today = serviceDay();
+    /* Le Barber Truck est fermé le lundi (soirée du lundi comprise, jusqu'à 02h30 le mardi) : aucune réservation possible ce jour-là. */
+    const isClosed = (d) => d.getDay() === 1;
+    const firstOpenDay = (d) => { const x = new Date(d); while (isClosed(x)) x.setDate(x.getDate() + 1); return x; };
     const state = {
       view: new Date(today.getFullYear(), today.getMonth(), 1),
-      date: new Date(today),
+      date: firstOpenDay(today),
       slot: null,
       service: '',
       serviceLabel: '',
@@ -193,6 +196,7 @@
 
     /* 'late' = finirait après 05h30 · 'past' = déjà passé · 'busy' = chevauche un rendez-vous confirmé · null = libre */
     function slotStatus(d, time) {
+      if (isClosed(d)) return 'closed';
       const start = toMin(time);
       const end = start + currentDuration();
       if (end > CLOSE) return 'late';
@@ -301,6 +305,7 @@
       for (let n = 1; n <= count; n++) {
         const d = new Date(view.getFullYear(), view.getMonth(), n);
         const past = d < today;
+        const closed = !past && isClosed(d);
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'day';
@@ -309,6 +314,11 @@
         if (past) {
           btn.classList.add('day--disabled');
           btn.disabled = true;
+        } else if (closed) {
+          btn.classList.add('day--disabled', 'day--closed');
+          btn.disabled = true;
+          btn.setAttribute('aria-label', `${longDate(d)} – fermé`);
+          btn.title = 'Fermé le lundi';
         } else {
           btn.classList.add(sameDay(d, state.date) ? 'day--selected' : 'day--available');
           btn.setAttribute('aria-label', longDate(d));
@@ -319,7 +329,7 @@
       daysEl.replaceChildren(frag);
     }
 
-    const LABELS = { busy: 'indisponible', past: 'horaire passé', late: 'trop tard pour cette durée' };
+    const LABELS = { closed: 'fermé le lundi', busy: 'indisponible', past: 'horaire passé', late: 'trop tard pour cette durée' };
     function renderSlots() {
       slotsDateEl.textContent = longDate(state.date);
       const frag = document.createDocumentFragment();

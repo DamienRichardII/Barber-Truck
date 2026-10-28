@@ -160,6 +160,8 @@ begin
   if p_time is null or p_time !~ '^(18|19|2[0-3]|0[0-2])h(00|30)$' then raise exception 'invalid_slot'; end if;
   -- la soirée d'hier reste réservable après minuit (créneaux 00h00-02h30 encore à venir) ; slot_passed écarte ce qui est passé
   if p_date is null or p_date < v_today - 1 or p_date > v_today + 120 then raise exception 'invalid_date'; end if;
+  -- fermé le lundi (soirée du lundi jusqu'à 02h30 le mardi comprise : c'est la date de service qui compte)
+  if extract(isodow from p_date) = 1 then raise exception 'closed_day'; end if;
 
   if p_service = 'offre-groupe' then
     v_size := coalesce(p_party_size, 0);
