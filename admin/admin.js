@@ -384,7 +384,7 @@
   }
 
   /* ---- comptes barber (chefs de projet) ---- */
-  const FN = `${cfg.supabaseUrl}/functions/v1/barber-accounts`;
+  const FN = `${cfg.supabaseUrl}/functions/v1/smart-processor`;
   const ROLE_LABEL = { barber_pending: 'En attente', barber: 'Actif', barber_revoked: 'Accès retiré' };
   async function barberCall(body, token) {
     const res = await fetch(FN, { method: 'POST', headers: { apikey: cfg.supabaseKey, Authorization: `Bearer ${token || (session && session.token) || cfg.supabaseKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
